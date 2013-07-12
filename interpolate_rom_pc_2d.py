@@ -6,7 +6,7 @@ from numpy import linspace
 from scipy import interpolate
 import pylab
 
-scalefactor = 0.5 * 27.076
+scalefactor = 0.5 * 27.1
 
 def f(x,y):
     return 0.5*x + sin(y)
@@ -63,6 +63,6 @@ for x in xs:
     y_bin = 0
     for y in ys:
         addr = pad(bin(x_bin)[2:], '0', 5) + pad(bin(y_bin)[2:], '0', 5)
-        print(float2sfixed(pc(x,y)))
+        print(float2sfixed(scalefactor * pc(x,y)))
         y_bin += 1
     x_bin += 1
