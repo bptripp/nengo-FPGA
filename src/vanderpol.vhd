@@ -178,6 +178,9 @@ begin
 
 --USE_H1: if (BYPASS_H1 = 0) generate
 
+    -- FIXME: CAREFUL WITH THIS!! The FIFOs will be run at 1024 elements all the time "for real", meaning they can be legitimately full and still continue to operate.
+    -- However FIFO Generator reports 1026 elements in a nomimally 1024-deep FIFO so this may be okay.
+    -- We know ahead of time that we can't write to the FIFO for three write clocks after a reset so we can just count.
     h1_x1_valid <= '1' when (h1_x1_input_valid = '1' and h1_x1_stall = '0') else '0';
     h1_x2_valid <= '1' when (h1_x2_input_valid = '1' and h1_x2_stall = '0') else '0';
 

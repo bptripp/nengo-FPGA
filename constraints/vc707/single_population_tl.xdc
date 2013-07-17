@@ -50,3 +50,4 @@ set_property IOSTANDARD LVCMOS18 [get_ports {SW[1]}]
 set_property IOSTANDARD LVCMOS18 [get_ports {SW[0]}]
 
 
+
