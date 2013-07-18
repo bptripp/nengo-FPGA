@@ -27,7 +27,7 @@ begin
         if(rising_edge(clk)) then
             port0_do <= RAM(to_integer(unsigned(port0_addr)));
             if(port0_we = '1') then
-                RAM(to_integer(unsigned(port0_addr))) <= port0_di;
+                RAM(to_integer(unsigned(port0_addr))) := port0_di;
             end if;
         end if;
     end process PORT0;
@@ -37,7 +37,7 @@ begin
         if(rising_edge(clk)) then
             port1_do <= RAM(to_integer(unsigned(port1_addr)));
             if(port1_we = '1') then
-                RAM(to_integer(unsigned(port1_addr))) <= port1_di;
+                RAM(to_integer(unsigned(port1_addr))) := port1_di;
             end if;
         end if;
     end process PORT1;    
