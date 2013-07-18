@@ -31,6 +31,7 @@ begin
         if(rst_i = '1') then
             next_counter := RESET_CYCLES;
             next_state := state_por;
+            rst_o <= '0';
             rst_done <= '0';
         else
             case state is
