@@ -36,8 +36,10 @@ entity delayed_shift_register is
     Port ( clk : in STD_LOGIC;
            rst : in STD_LOGIC;
            din : in STD_LOGIC;
-           shift : in STD_LOGIC;
-           dout : out STD_LOGIC_VECTOR (N-1 downto 0));
+           shift : in STD_LOGIC;         
+           dout : out STD_LOGIC_VECTOR (N-1 downto 0);
+           done: out std_logic
+           );
 end delayed_shift_register;
 
 architecture Behavioral of delayed_shift_register is
@@ -79,11 +81,13 @@ begin
             if(rst = '1') then
                 data <= (others=>'0');
                 timer <= TIMER_RESET_VALUE;
+                counter <= COUNTER_RESET_VALUE;
+                done <= '0';
             elsif(shift = '1') then
                 if(timer /= TIMER_ZERO_VALUE) then -- if we're still counting down, decrement timer and don't shift
                     timer <= next_timer;
                 elsif(counter = COUNTER_ZERO_VALUE) then -- if we've already shifted N times, don't shift
-                    null;
+                    done <= '1';
                 else -- shift and decrease counter
                     data <= data(N-2 downto 0) & din; -- shift into LSB (i.e. present words with MSB first)
                     counter <= next_counter;
