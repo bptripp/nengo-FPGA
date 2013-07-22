@@ -4,7 +4,7 @@ use ieee.std_logic_1164.all;
 library ieee_proposed;
 use ieee_proposed.fixed_pkg.all;
 
-entity decoder_unit_top_half is port (
+entity decoder_unit_top_half_1d is port (
     clk: in std_logic;
     rst: in std_logic;    
     encoder_fifo_u: in std_logic_vector(11 downto 0);
@@ -29,9 +29,9 @@ entity decoder_unit_top_half is port (
     normal_prog_addr: in std_logic_vector(1 downto 0);
     normal_prog_we: in std_logic;
     normal_prog_data: in std_logic_vector(31 downto 0)
-); end entity decoder_unit_top_half;
+); end entity decoder_unit_top_half_1d;
 
-architecture rtl of decoder_unit_top_half is
+architecture rtl of decoder_unit_top_half_1d is
     type state_type is (state_wait_for_fifo, state_wait_for_pc, state_wait_for_next_stage_ack);
     type ci_type is record
         state: state_type;
