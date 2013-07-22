@@ -37,7 +37,9 @@ entity principal_component_1d is
     );
     Port ( clk : in STD_LOGIC;
            addr : in STD_LOGIC_VECTOR (9 downto 0);
-           data : out STD_LOGIC_VECTOR (11 downto 0); -- FIXME built-in ready and valid
+           valid: in std_logic;
+           data : out STD_LOGIC_VECTOR (11 downto 0);
+           ready: out std_logic;
            
            prog_addr: in std_logic_vector(9 downto 0);
            prog_cs: in std_logic;
@@ -67,6 +69,13 @@ architecture Behavioral of principal_component_1d is
     shared variable PC : PrincipalComponentMemoryType := InitFromFile(loadfile);
     
 begin
+
+    HANDSHAKE: process(clk, valid)
+    begin
+        if(rising_edge(clk)) then
+            ready <= valid; -- single-cycle read
+        end if;
+    end process HANDSHAKE;
 
     PC_ROM: process(clk, addr)
     begin
