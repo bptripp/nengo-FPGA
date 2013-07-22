@@ -70,7 +70,7 @@ architecture Behavioral of delayed_shift_register is
 begin
     dout <= data;
     
-    process(clk, rst, din, shift)
+    process(clk, rst, din, shift, timer, counter)
         variable next_timer: unsigned(TIMER_WIDTH-1 downto 0);
         variable next_counter: unsigned(COUNTER_WIDTH-1 downto 0);
     begin
