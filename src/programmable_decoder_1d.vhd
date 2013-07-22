@@ -174,7 +174,6 @@ begin
         if(rising_edge(clk)) then
             if(rst = '1') then
                 next_counter := "0000000000";
-                write_enable := '0';
                 write_ctrl_stall <= '0';
             elsif(write_ctrl_stall = '1') then
                 if(timestep = '1') then
@@ -194,9 +193,9 @@ begin
                     end if;
                 end if;
             end if;
+            dv_we <= write_enable;
+            write_ctrl_counter <= next_counter;
         end if;
-        dv_we <= write_enable;
-        write_ctrl_counter <= next_counter;
     end process WRITE_CTRL;
 
 end architecture rtl;
