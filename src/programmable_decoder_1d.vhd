@@ -78,6 +78,8 @@ architecture rtl of programmable_decoder_1d is
     type register_bank_type is array(0 to 7) of std_logic_vector(11 downto 0);
     signal pc_bank: register_bank_type;
     signal v_bank: register_bank_type;
+    type sfixed_bank_type is array(0 to 7) of sfixed(1 downto -10);
+    signal v_sfixed_bank: sfixed_bank_type;
     signal bank_valid: std_logic := '0';
     
     signal decoder_valid: std_logic;
@@ -141,6 +143,10 @@ begin
         end if;
     end process BANK_REG;
     
+    V_TO_SFIXED: for I in 0 to 7 generate
+        v_sfixed_bank(I) <= to_sfixed(v_bank(I), 1,-10);
+    end generate;
+    
     DECODER: variable_coefficient_decoder generic map (shift => shift) port map (
         clk => clk,
         pc_output_ready => ack,        
@@ -152,14 +158,14 @@ begin
         pc5_data => pc_bank(5),
         pc6_data => pc_bank(6),
         normal_data => pc_bank(7),
-        v0 => to_sfixed(v_bank(0), 1,-10),
-        v1 => to_sfixed(v_bank(1), 1,-10),
-        v2 => to_sfixed(v_bank(2), 1,-10),
-        v3 => to_sfixed(v_bank(3), 1,-10),
-        v4 => to_sfixed(v_bank(4), 1,-10),
-        v5 => to_sfixed(v_bank(5), 1,-10),
-        v6 => to_sfixed(v_bank(6), 1,-10),
-        vr => to_sfixed(v_bank(7), 1,-10),
+        v0 => v_sfixed_bank(0),
+        v1 => v_sfixed_bank(1),
+        v2 => v_sfixed_bank(2),
+        v3 => v_sfixed_bank(3),
+        v4 => v_sfixed_bank(4),
+        v5 => v_sfixed_bank(5),
+        v6 => v_sfixed_bank(6),
+        vr => v_sfixed_bank(7),
         
         decoded_value => decoded_value,
         valid => decoder_valid
@@ -182,7 +188,7 @@ begin
                 end if;
             else
                 if(decoder_valid = '1') then
-                    dv_addr <= to_std_logic_vector(write_ctrl_counter);
+                    dv_addr <= std_logic_vector(write_ctrl_counter);
                     write_enable := '1';
                     dv_data <= to_slv(decoded_value);
                     -- register decoder output and address on dv interface

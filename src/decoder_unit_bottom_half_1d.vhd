@@ -28,7 +28,7 @@ entity decoder_unit_bottom_half_1d is generic (
     shreg_data: in std_logic_vector(31 downto 0); -- 8 coefficients per decoder * 4 decoders
     shreg_shift: in std_logic;
     shreg_clear: in std_logic;
-    shreg_ready: in std_logic;
+    --shreg_ready: in std_logic;
     shreg_ack: out std_logic;
     
     -- DV write ports
@@ -102,7 +102,8 @@ architecture rtl of decoder_unit_bottom_half_1d is
            ); end component delayed_shift_register;
            
    type decoder_coefficient_bank is array(0 to 7) of std_logic_vector(11 downto 0);
-   type decoder_bank is array(0 to 3) of decoder_coefficient_bank;
+   type decoder_bank_type is array(0 to 3) of decoder_coefficient_bank;
+   signal decoder_bank: decoder_bank_type;
    signal decoder_ack: std_logic_vector(3 downto 0);
    signal decoder_done: std_logic_vector(3 downto 0);
    
@@ -112,7 +113,7 @@ architecture rtl of decoder_unit_bottom_half_1d is
    type decoder_data_type is array(0 to 3) of std_logic_vector(11 downto 0);
    signal decoder_dv_data: decoder_data_type;
    
-   signal shreg_ready: std_logic(31 downto 0); -- convenience. all shregs will finish simultaneously
+   signal shreg_ready: std_logic_vector(31 downto 0); -- convenience. all shregs will finish simultaneously
 begin
 
     DECODERS: for I in 0 to 3 generate
@@ -136,21 +137,21 @@ begin
             clk => clk,
             rst => rst,
             pc0_data => pc0,
-            pc0_data => pc0,
-            pc0_data => pc0,
-            pc0_data => pc0,
-            pc0_data => pc0,
-            pc0_data => pc0,
-            pc0_data => pc0,
+            pc1_data => pc1,
+            pc2_data => pc2,
+            pc3_data => pc3,
+            pc4_data => pc4,
+            pc5_data => pc5,
+            pc6_data => pc6,
             pc7_data => pc7,
             pc_ready => pc_ready,
             v0 => decoder_bank(I)(0),
-            v0 => decoder_bank(I)(0),
-            v0 => decoder_bank(I)(0),
-            v0 => decoder_bank(I)(0),
-            v0 => decoder_bank(I)(0),
-            v0 => decoder_bank(I)(0),
-            v0 => decoder_bank(I)(0),
+            v1 => decoder_bank(I)(1),
+            v2 => decoder_bank(I)(2),
+            v3 => decoder_bank(I)(3),
+            v4 => decoder_bank(I)(4),
+            v5 => decoder_bank(I)(5),
+            v6 => decoder_bank(I)(6),
             v7 => decoder_bank(I)(7),
             shreg_ready => shreg_ready(0), -- cheating, as mentioned above
             data_ack => decoder_ack(I),
@@ -163,7 +164,8 @@ begin
     end generate;
     
     -- blatant cheating, but if all shregs finish simultaneously then this is okay
-    data_ack <= decoder_ack(0);
+    pc_ack <= decoder_ack(0);
+    shreg_ack <= decoder_ack(0); -- I thiiiink this is what I want here
     
     -- dv port wiring
     dv0_addr(10) <= '0';
