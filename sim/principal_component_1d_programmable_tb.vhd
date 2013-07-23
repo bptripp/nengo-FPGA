@@ -55,6 +55,18 @@ signal dv_prog_addr: std_logic_vector(10 downto 0);
 signal dv_prog_we: std_logic;
 signal dv_prog_data: std_logic_vector(11 downto 0); 
 
+component encoder_pipeline_controller     generic (
+        N: integer -- number of encoders
+    );
+    port (
+        clk: in std_logic;
+        encoder_done: in std_logic_vector(N-1 downto 0);
+        timestep: in std_logic;
+        fifo_full: in std_logic_vector(N-1 downto 0);
+        
+        encode_next: out std_logic
+    ); end component;
+
 component encoder_unit port (
     clk: in std_logic;
     rst: in std_logic;
@@ -70,6 +82,17 @@ component encoder_unit port (
     prog_we: in std_logic;
     prog_data: in std_logic_vector(39 downto 0)
 ); end component;
+
+component encoder_fifo  PORT (
+    clk : IN STD_LOGIC;
+    rst : IN STD_LOGIC;
+    din : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+    wr_en : IN STD_LOGIC;
+    rd_en : IN STD_LOGIC;
+    dout : OUT STD_LOGIC_VECTOR(11 DOWNTO 0);
+    full : OUT STD_LOGIC;
+    empty : OUT STD_LOGIC
+  ); end component;
 
 component first_order_filter_unit port (
     clk: in std_logic;
