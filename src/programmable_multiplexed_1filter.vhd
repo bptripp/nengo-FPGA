@@ -65,26 +65,29 @@ architecture Behavioral of programmable_multiplexed_1filter is
     
     signal x_state: sfixed(1 downto -16) := to_sfixed(0, 1,-16);
     signal y_out: sfixed(1 downto -10) := to_sfixed(0, 1,-10);
+    
+    signal stall: std_logic := '0';
 begin
 
 y <= y_out;
 x1 <= x_state;
+ready <= stall;
 
-process(clk, rst, x, u, valid, ack)
+process(clk, rst, x, u, valid, ack, stall)
 begin
     if(rising_edge(clk)) then
         if(ack = '1') then
-            ready <= '0';
+            stall <= '0';
         end if;
         if(rst = '1') then
             x_state <= to_sfixed(0, 1,-16);
             y_out <= to_sfixed(0, 1,-10);
-            ready <= '0';
+            stall <= '0';
             we <= '0';
-        elsif(valid = '1') then
+        elsif(valid = '1' and stall = '0') then
             x_state <= resize(A*x + B*u, x_state);
             y_out <= resize(C*x + D*u, y_out);
-            ready <= '1';
+            stall <= '1';
             we <= '1';
         else
             we <= '0'; -- clear after 1 cycle
