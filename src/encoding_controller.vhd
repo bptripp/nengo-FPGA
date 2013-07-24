@@ -120,6 +120,10 @@ begin
         ci.weight_s1 := to_sfixed(0, ci.weight_s1); -- to prevent us from multiplying bogus data 
         ci.last_s1 := '0';
         -- reset condition
+        
+        -- multiply and accumulate by default...this should always happen first so it can be overridden by e.g. a reset
+        ci.sum := resize(reg.sum + reg.weight * to_sfixed(dv_data, 1, -10), ci.sum);
+        
         if(rst = '1') then            
             ci.dv_addr := "0000000000000000000";
             --ci.dv_cs := '0';
@@ -214,9 +218,7 @@ begin
             ci.last_s2 := reg.last_s1;
             ci.last_s3 := reg.last_s2;
             ci.last := reg.last_s3;
-            
-            -- multiply and accumulate
-            ci.sum := resize(reg.sum + reg.weight * to_sfixed(dv_data, 1, -10), ci.sum);
+                        
             if(reg.last = '1') then
                 ci.done := '1';
             end if;
