@@ -5,6 +5,9 @@ use ieee.numeric_std.all;
 library ieee_proposed;
 use ieee_proposed.fixed_pkg.all;
 
+library std;
+use std.textio.all;
+
 entity principal_component_1d_programmable_tb is
 end entity;
 
@@ -186,6 +189,46 @@ component first_order_filter_unit port (
     prog_we: in std_logic;
     prog_data: in std_logic_vector(11 downto 0)
 ); end component;
+signal h1_u: sfixed(1 downto -10);
+signal h1_valid: std_logic;
+signal h1_y: sfixed(1 downto -10);
+signal h1_ready: std_logic;
+signal h1_ready_stb: std_logic;
+signal h1_ack: std_logic;
+signal h1_prog_addr: std_logic_vector(1 downto 0);
+signal h1_prog_we: std_logic;
+signal h1_prog_data: std_logic_vector(11 downto 0);
+
+procedure PROGRAM_FILTER (
+    signal addr: out std_logic_vector(1 downto 0);
+    signal we: out std_logic;
+    signal data: out std_logic_vector(11 downto 0)
+) is
+begin
+    we <= '0';
+    
+    addr <= "00"; -- A
+    we <= '1';
+    data <= to_slv(to_sfixed(0.99005, 1,-10));
+    wait for CLOCK_PERIOD;
+    
+    addr <= "01"; -- B
+    we <= '1';
+    data <= to_slv(to_sfixed(0.00995, 1,-10));
+    wait for CLOCK_PERIOD;
+    
+    addr <= "10"; -- C
+    we <= '1';
+    data <= to_slv(to_sfixed(0.99005, 1,-10));
+    wait for CLOCK_PERIOD;
+    
+    addr <= "11"; -- D
+    we <= '1';
+    data <= to_slv(to_sfixed(0.00995, 1,-10));
+    wait for CLOCK_PERIOD;
+    
+    we <= '0';
+end procedure PROGRAM_FILTER;
 
 component pipelined_adder port (
     clk: in std_logic;
@@ -226,6 +269,64 @@ component decoder_unit_top_half_1d port (
     normal_prog_we: in std_logic;
     normal_prog_data: in std_logic_vector(31 downto 0)
 ); end component;
+signal decoder_u: std_logic_vector(11 downto 0);
+signal decoder_empty: std_logic;
+signal decoder_rd_en: std_logic;
+signal decoder_pc0: std_logic_vector(11 downto 0);
+signal decoder_pc1: std_logic_vector(11 downto 0);
+signal decoder_pc2: std_logic_vector(11 downto 0);
+signal decoder_pc3: std_logic_vector(11 downto 0);
+signal decoder_pc4: std_logic_vector(11 downto 0);
+signal decoder_pc5: std_logic_vector(11 downto 0);
+signal decoder_pc6: std_logic_vector(11 downto 0);
+signal decoder_pc7: std_logic_vector(11 downto 0);
+signal decoder_valid: std_logic;
+signal decoder_ack: std_logic;
+
+signal decoder_pc_prog_addr: std_logic_vector(13 downto 0);
+signal decoder_pc_prog_we: std_logic;
+signal decoder_pc_prog_data: std_logic_vector(11 downto 0);
+
+signal decoder_normal_prog_addr: std_logic_vector(1 downto 0);
+signal decoder_normal_prog_we: std_logic;
+signal decoder_normal_prog_data: std_logic_vector(31 downto 0);
+
+    type PrincipalComponentMemoryType is array(0 to 1023) of std_logic_vector(11 downto 0);
+          
+    impure function InitPCFromFile (FileName: in string) return PrincipalComponentMemoryType is
+        FILE ROMFile : text is in FileName;
+        variable ROMFileLine : line;
+        variable ROM: PrincipalComponentMemoryType;
+        variable tmp: bit_vector(11 downto 0);
+    begin
+        for I in PrincipalComponentMemoryType'range loop
+            readline(ROMFile, ROMFileLine);
+            read(ROMFileLine, tmp);
+            ROM(I) := to_stdlogicvector(tmp);
+        end loop;
+        return ROM;
+    end function; 
+
+procedure PROGRAM_PRINCIPAL_COMPONENT (
+    FileName: string;
+    addr_hi: std_logic_vector(3 downto 0);
+    signal addr: out std_logic_vector(13 downto 0);
+    signal we: out std_logic;
+    signal data: out std_logic_vector(11 downto 0)
+) is
+    variable ROM: PrincipalComponentMemoryType;
+begin
+    ROM := InitPCFromFile(FileName);
+    addr(13 downto 10) <= addr_hi;
+    we <= '0';
+    for I in 0 to 1023 loop
+        addr(9 downto 0) <= std_logic_vector(to_unsigned(I, 10));
+        data <= ROM(I);
+        we <= '1';
+        wait for CLOCK_PERIOD;
+    end loop;
+    we <= '0';
+end procedure PROGRAM_PRINCIPAL_COMPONENT;    
 
 component decoder_unit_bottom_half_1d generic (
     shift: integer := 0;
@@ -367,8 +468,54 @@ ENCODER_PIPE: encoder_fifo  PORT MAP (
   );
 encoder_fifo_din <= to_slv(encoder_sum);
 encoder_fifo_we <= encoder_we;
--- FIXME: TEMPORARY
-encoder_fifo_re <= '0';
+
+H1: first_order_filter_unit port map (
+    clk => clk,
+    rst => rst,
+    u => h1_u,
+    valid => h1_valid,
+    y => h1_y,
+    ready => h1_ready,
+    ready_stb => h1_ready_stb,
+    ack => h1_ack,
+
+    prog_addr => h1_prog_addr,
+    prog_we => h1_prog_we,
+    prog_data => h1_prog_data
+);
+h1_u <= to_sfixed(encoder_fifo_dout, 1,-10);
+h1_valid <= '1' when (encoder_fifo_empty = '0') else '0';
+encoder_fifo_re <= h1_ready_stb;
+
+DECODER_TOP_HALF: decoder_unit_top_half_1d port map (
+    clk => clk,
+    rst => rst,
+    encoder_fifo_u => decoder_u,
+    encoder_fifo_empty => decoder_empty,
+    encoder_fifo_rd_en => decoder_rd_en,
+    pc0 => decoder_pc0,
+    pc1 => decoder_pc1,
+    pc2 => decoder_pc2,
+    pc3 => decoder_pc3,
+    pc4 => decoder_pc4,
+    pc5 => decoder_pc5,
+    pc6 => decoder_pc6,
+    pc7 => decoder_pc7,
+    pc_valid => decoder_valid,
+    pc_ack => decoder_ack,
+    
+    pc_prog_addr => decoder_pc_prog_addr,
+    pc_prog_we => decoder_pc_prog_we,
+    pc_prog_data => decoder_pc_prog_data,
+    
+    normal_prog_addr => decoder_normal_prog_addr,
+    normal_prog_we => decoder_normal_prog_we,
+    normal_prog_data => decoder_normal_prog_data
+);
+decoder_u <= to_slv(h1_y);
+decoder_empty <= '1' when h1_ready = '0' else '0';
+h1_ack <= decoder_rd_en;
+decoder_ack <= '0'; -- FIXME TEMPORARY
 
 tb: process
 begin
@@ -378,6 +525,9 @@ begin
     encoder_prog_we <= '0';
     swap_banks <= '0';
     dv_prog_we <= '0';
+    h1_prog_we <= '0';
+    decoder_pc_prog_we <= '0';
+    decoder_normal_prog_we <= '0';
     
     wait for CLOCK_PERIOD*2;
     rst_i <= '0';
@@ -394,6 +544,24 @@ begin
     wait for CLOCK_PERIOD;
     
     PROGRAM_ENCODER(encoder_prog_we, encoder_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_FILTER(h1_prog_addr, h1_prog_we, h1_prog_data);
+    wait for CLOCK_PERIOD;
+    
+    PROGRAM_PRINCIPAL_COMPONENT("integrator0.rom", "0000", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_PRINCIPAL_COMPONENT("integrator1.rom", "0001", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_PRINCIPAL_COMPONENT("integrator2.rom", "0010", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_PRINCIPAL_COMPONENT("integrator3.rom", "0011", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_PRINCIPAL_COMPONENT("integrator4.rom", "0100", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_PRINCIPAL_COMPONENT("integrator5.rom", "0101", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
+    PROGRAM_PRINCIPAL_COMPONENT("integrator6.rom", "0110", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
+    wait for CLOCK_PERIOD;
     
     wait for CLOCK_PERIOD*5;
     prog_ok <= '0';
