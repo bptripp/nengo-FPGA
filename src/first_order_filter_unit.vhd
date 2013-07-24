@@ -11,6 +11,7 @@ entity first_order_filter_unit is port (
     valid: in std_logic;
     y: out sfixed(1 downto -10);
     ready: out std_logic;
+    ready_stb: out std_logic;
     ack: in std_logic;
     
     prog_addr: in std_logic_vector(1 downto 0);
@@ -88,6 +89,8 @@ FILTER: programmable_multiplexed_1filter port map (
     prog_we => prog_we,
     prog_data => prog_data    
 );
+
+ready_stb <= filter_we; -- cheating, but it serves the same purpose
 
 fifo_din <= std_logic_vector(filter_x1);
 filter_x <= to_sfixed(fifo_dout, 1, -16);
