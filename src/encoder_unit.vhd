@@ -11,7 +11,7 @@ entity encoder_unit is port (
     dv_addr: out std_logic_vector(18 downto 0);
     dv_port: out std_logic;
     dv_data: in std_logic_vector(11 downto 0);
-    sum: out sfixed(1 downto 10);
+    sum: out sfixed(1 downto -10);
     done: out std_logic;
     we: out std_logic;
     

@@ -12,7 +12,7 @@
 -- Instruction format is as follows:
 -- |L|TTTTTTT|P|AAAAAAAAAAAAAAAAAAA|WWWWWWWWWWWW|
 -- where L is the 'last flag', T is the time delay, P is the port number,
--- A is the decoded value address, and W is the weight
+-- A is the decoded value address, and W is the weight (sfixed, 1 downto -10)
 -- Dependencies: 
 -- 
 -- Revision:
@@ -80,7 +80,7 @@ architecture Behavioral of encoding_controller is
         dv_addr => "0000000000000000000",
         dv_port => '0',
         sum => "000000000000", 
-        done => '1',
+        done => '0', -- FIXME was 1
 
         state => state_idle,
         next_insn => '0',
@@ -90,12 +90,12 @@ architecture Behavioral of encoding_controller is
         weight_s1 => X"000",
         weight_s2 => X"000",
         weight_s3 => X"000",
-        last_s1 => '1',
-        last_s2 => '1',
-        last_s3 => '1',
+        last_s1 => '0',
+        last_s2 => '0',
+        last_s3 => '0',
         
         weight => X"000",
-        last => '1'
+        last => '0' -- FIXME was 1
     );
     signal ci_next: ci_type;
     
@@ -125,7 +125,7 @@ begin
             --ci.dv_cs := '0';
             ci.dv_port := '0';
             ci.sum := "000000000000";
-            ci.done := '1';
+            ci.done := '0'; -- FIXME was 1, this should not break anything in the pipelined design
             
             ci.state := state_idle;
             ci.next_insn := '0';
