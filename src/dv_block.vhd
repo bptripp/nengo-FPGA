@@ -19,7 +19,7 @@ end entity;
 
 architecture rtl of dv_block is
     type ram_type is array(0 to 2047) of std_logic_vector(11 downto 0);
-    shared variable RAM: ram_type;
+    shared variable RAM: ram_type := (others=>X"000");
 begin
 
     PORT0: process(clk)
