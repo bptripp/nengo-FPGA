@@ -81,6 +81,17 @@ begin
     we <= '0';
 end procedure PROGRAM_DV; 
 
+component delay_line generic (
+    N: natural := 1; -- port width
+    T: natural := 0
+); port (
+    clk: in std_logic;
+    d: in std_logic_vector(N-1 downto 0);
+    q: out std_logic_vector(N-1 downto 0)
+); end component;
+signal dv_rd0_data_delayed: std_logic_vector(11 downto 0);
+signal dv_rd1_data_delayed: std_logic_vector(11 downto 0);
+
 component encoder_pipeline_controller     generic (
         N: integer -- number of encoders
     );
@@ -296,6 +307,24 @@ DV_BANK0: dv_double_buffer port map (
     wr1_data => dv_prog_data
 );
 
+-- to simulate the multi-cycle delay of the interconnect
+DELAY_RD0: delay_line generic map (
+    N => 12,
+    T => 2
+) port map (
+    clk => clk,
+    d => dv_rd0_data,
+    q => dv_rd0_data_delayed
+);
+DELAY_RD1: delay_line generic map (
+    N => 12,
+    T => 2
+) port map (
+    clk => clk,
+    d => dv_rd1_data,
+    q => dv_rd1_data_delayed
+);
+
 ENCODER: encoder_unit port map (
     clk => clk,
     rst => rst,
@@ -312,7 +341,7 @@ ENCODER: encoder_unit port map (
     prog_data => encoder_prog_data
 );
 dv_rd0_addr <= encoder_dv_addr(10 downto 0);
-encoder_dv_data <= dv_rd0_data;
+encoder_dv_data <= dv_rd0_data_delayed;
 
 ENCODER_PIPE_CTRL: encoder_pipeline_controller generic map (
         N => 1
@@ -338,6 +367,8 @@ ENCODER_PIPE: encoder_fifo  PORT MAP (
   );
 encoder_fifo_din <= to_slv(encoder_sum);
 encoder_fifo_we <= encoder_we;
+-- FIXME: TEMPORARY
+encoder_fifo_re <= '0';
 
 tb: process
 begin
@@ -363,6 +394,12 @@ begin
     wait for CLOCK_PERIOD;
     
     PROGRAM_ENCODER(encoder_prog_we, encoder_prog_data);
+    
+    wait for CLOCK_PERIOD*5;
+    prog_ok <= '0';
+    timestep <= '1';
+    wait for CLOCK_PERIOD;
+    timestep <= '0';
     
     wait;
 end process tb;
