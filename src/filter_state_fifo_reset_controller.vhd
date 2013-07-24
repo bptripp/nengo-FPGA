@@ -7,10 +7,10 @@ entity filter_state_fifo_reset_controller is port (
     rst: in std_logic;
     fifo_rst: out std_logic;
     fifo_full: in std_logic;
-    fifo_data: out std_logic_vector(11 downto 0);
+    fifo_data: out std_logic_vector(17 downto 0);
     fifo_we: out std_logic;
     
-    user_data: in std_logic_vector(11 downto 0);
+    user_data: in std_logic_vector(17 downto 0);
     user_we: in std_logic
 ); end entity;
 
@@ -19,7 +19,7 @@ architecture rtl of filter_state_fifo_reset_controller is
 type state_type is (state_wait_for_rst, state_wait_for_fifo, state_init_fifo, state_idle);
 signal state: state_type := state_wait_for_rst;
 
-signal data: std_logic_vector(11 downto 0) := (others=>'0');
+signal data: std_logic_vector(17 downto 0) := (others=>'0');
 signal we: std_logic := '0';
 
 signal INIT_COUNTER: unsigned(9 downto 0) := "1111111111"; -- 1023
