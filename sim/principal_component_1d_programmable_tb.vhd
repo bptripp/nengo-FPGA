@@ -166,6 +166,7 @@ component encoder_fifo  PORT (
     rd_en : IN STD_LOGIC;
     dout : OUT STD_LOGIC_VECTOR(11 DOWNTO 0);
     full : OUT STD_LOGIC;
+    almost_full : OUT STD_LOGIC;
     empty : OUT STD_LOGIC
   ); end component;
 signal encoder_fifo_din: std_logic_vector(11 downto 0);
@@ -173,6 +174,7 @@ signal encoder_fifo_we: std_logic;
 signal encoder_fifo_re: std_logic;
 signal encoder_fifo_dout: std_logic_vector(11 downto 0);
 signal encoder_fifo_full: std_logic;
+signal encoder_fifo_almost_full: std_logic;
 signal encoder_fifo_empty: std_logic;
 
 component first_order_filter_unit port (
@@ -490,7 +492,7 @@ ENCODER_PIPE_CTRL: encoder_pipeline_controller generic map (
         clk => clk,
         encoder_done(0) => encoder_done,
         timestep => timestep,
-        fifo_full(0) => encoder_fifo_full,
+        fifo_full(0) => encoder_fifo_almost_full,
         
         encode_next => encoder_next_population
     );
@@ -503,6 +505,7 @@ ENCODER_PIPE: encoder_fifo  PORT MAP (
     rd_en => encoder_fifo_re,
     dout => encoder_fifo_dout,
     full => encoder_fifo_full,
+    almost_full => encoder_fifo_almost_full,
     empty => encoder_fifo_empty
   );
 encoder_fifo_din <= to_slv(encoder_sum);
