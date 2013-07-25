@@ -88,7 +88,6 @@ architecture rtl of programmable_decoder_1d is
     
     signal write_ctrl_stall: std_logic := '0'; -- waiting for next timestep
     signal write_ctrl_counter: unsigned(9 downto 0) := (others=>'0');
-    signal write_ctrl_done: std_logic := '0';
     
 begin
 
@@ -186,7 +185,7 @@ begin
         valid => decoder_valid
     );
         
-    all_done <= write_ctrl_done;
+    all_done <= write_ctrl_stall;
     WRITE_CTRL: process(clk, rst, timestep, decoder_valid, decoded_value, write_ctrl_counter, write_ctrl_stall)
         variable write_enable: std_logic;
         variable next_counter: unsigned(9 downto 0);

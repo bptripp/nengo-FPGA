@@ -166,6 +166,7 @@ begin
     -- blatant cheating, but if all shregs finish simultaneously then this is okay
     pc_ack <= decoder_ack(0);
     shreg_ack <= decoder_ack(0); -- I thiiiink this is what I want here
+    all_done <= decoder_done(0);
     
     -- dv port wiring
     dv0_addr(10) <= '0';
