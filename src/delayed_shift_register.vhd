@@ -67,8 +67,10 @@ architecture Behavioral of delayed_shift_register is
     signal counter: unsigned(COUNTER_WIDTH-1 downto 0) := COUNTER_RESET_VALUE;
 
     signal data : std_logic_vector(N-1 downto 0) := (others=>'0');
+    signal done_flag: std_logic := '0';
 begin
     dout <= data;
+    done <= done_flag;
     
     process(clk, rst, din, shift, timer, counter)
         variable next_timer: unsigned(TIMER_WIDTH-1 downto 0);
@@ -82,15 +84,18 @@ begin
                 data <= (others=>'0');
                 timer <= TIMER_RESET_VALUE;
                 counter <= COUNTER_RESET_VALUE;
-                done <= '0';
+                done_flag <= '0';
             elsif(shift = '1') then
                 if(timer /= TIMER_ZERO_VALUE) then -- if we're still counting down, decrement timer and don't shift
                     timer <= next_timer;
                 elsif(counter = COUNTER_ZERO_VALUE) then -- if we've already shifted N times, don't shift
-                    done <= '1';
+                    done_flag <= '1';
                 else -- shift and decrease counter
                     data <= data(N-2 downto 0) & din; -- shift into LSB (i.e. present words with MSB first)
                     counter <= next_counter;
+                    if(next_counter = COUNTER_ZERO_VALUE) then
+                        done_flag <= '1';
+                    end if;
                 end if;
             end if;
         end if;

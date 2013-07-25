@@ -351,7 +351,7 @@ component decoder_unit_bottom_half_1d generic (
     shreg_data: in std_logic_vector(31 downto 0); -- 8 coefficients per decoder * 4 decoders
     shreg_shift: in std_logic;
     shreg_clear: in std_logic;
-    shreg_ready: in std_logic;
+    --shreg_ready: in std_logic;
     shreg_ack: out std_logic;
     
     -- DV write ports
@@ -372,6 +372,45 @@ component decoder_unit_bottom_half_1d generic (
     all_done: out std_logic
     
 ); end component;
+signal decoder_bottom_half_all_done: std_logic;
+
+component decoder_fifo   PORT (
+    rst : IN STD_LOGIC;
+    wr_clk : IN STD_LOGIC;
+    rd_clk : IN STD_LOGIC;
+    din : IN STD_LOGIC_VECTOR(511 DOWNTO 0);
+    wr_en : IN STD_LOGIC;
+    rd_en : IN STD_LOGIC;
+    dout : OUT STD_LOGIC_VECTOR(511 DOWNTO 0);
+    full : OUT STD_LOGIC;
+    empty : OUT STD_LOGIC
+  ); end component;
+signal decoder_coefficient_fifo_din: std_logic_vector(511 downto 0) := (others=>'1');
+signal decoder_coefficient_fifo_wr_en: std_logic;
+signal decoder_coefficient_fifo_full: std_logic;
+signal decoder_coefficient_fifo_dout: std_logic_vector(511 downto 0);
+signal decoder_coefficient_fifo_empty: std_logic;
+
+component shift_controller generic (
+    N: natural := 1; -- number of acknowledge lines
+    C: unsigned(7 downto 0) -- shift count to load all decoders, usually 72 or 144 for 96 1-D or 96 2-D population units respectively
+); 
+port (
+    clk: in std_logic;
+    rst: in std_logic;
+    fifo_data: in std_logic_vector(511 downto 0);
+    fifo_empty: in std_logic;
+    fifo_rd_en: out std_logic;
+    shift_data: out std_logic_vector(511 downto 0);
+    shift_clear: out std_logic;
+    shift_en: out std_logic;
+    shift_ack: in std_logic_vector(N-1 downto 0)
+); end component;
+signal shift_fifo_rd_en: std_logic;
+signal shift_data: std_logic_vector(511 downto 0);
+signal shift_clear: std_logic;
+signal shift_en: std_logic;
+signal shift_ack: std_logic_vector(0 downto 0) := (others=>'0'); -- FIXME
 
 begin
 
@@ -515,7 +554,70 @@ DECODER_TOP_HALF: decoder_unit_top_half_1d port map (
 decoder_u <= to_slv(h1_y);
 decoder_empty <= '1' when h1_ready = '0' else '0';
 h1_ack <= decoder_rd_en;
-decoder_ack <= '0'; -- FIXME TEMPORARY
+
+DECODER_COEFFICIENT_FIFO: decoder_fifo port map (
+    rst => rst,    
+    wr_clk => clk,
+    din => decoder_coefficient_fifo_din,
+    wr_en => decoder_coefficient_fifo_wr_en,
+    full => decoder_coefficient_fifo_full, 
+    
+    rd_clk => clk,
+    dout => decoder_coefficient_fifo_dout,
+    rd_en => shift_fifo_rd_en,
+    empty => decoder_coefficient_fifo_empty    
+);
+
+SHIFT_CTL: shift_controller generic map (
+    N => 1,
+    C => to_unsigned(12, 8) -- one decoder, therefore 12 shreg bits
+) port map (
+    clk => clk,
+    rst => rst,
+    fifo_data => decoder_coefficient_fifo_dout,
+    fifo_empty => decoder_coefficient_fifo_empty,
+    fifo_rd_en => shift_fifo_rd_en,
+    shift_data => shift_data,
+    shift_clear => shift_clear,
+    shift_en => shift_en,
+    shift_ack => shift_ack
+);
+
+DECODER_BOTTOM_HALF: decoder_unit_bottom_half_1d generic map (
+    shift => 0,
+    skip_count => 0
+) port map (
+    clk => clk,
+    rst => rst,
+    pc0 => decoder_pc0,
+    pc1 => decoder_pc1,
+    pc2 => decoder_pc2,
+    pc3 => decoder_pc3,
+    pc4 => decoder_pc4,
+    pc5 => decoder_pc5,
+    pc6 => decoder_pc6,
+    pc7 => decoder_pc7,
+    pc_ready => decoder_valid,
+    pc_ack => decoder_ack,
+    shreg_data => shift_data(31 downto 0),
+    shreg_shift => shift_en,
+    shreg_clear => shift_clear,
+    shreg_ack => shift_ack(0),
+    dv0_addr => dv_wr0_addr,
+    dv0_we => dv_wr0_we,
+    dv0_data => dv_wr0_data,
+    dv1_addr => open,
+    dv1_we => open,
+    dv1_data => open,
+    dv2_addr => open,
+    dv2_we => open,
+    dv2_data => open,
+    dv3_addr => open,
+    dv3_we => open,
+    dv3_data => open,
+    timestep => timestep,
+    all_done => decoder_bottom_half_all_done
+);
 
 tb: process
 begin
@@ -528,6 +630,7 @@ begin
     h1_prog_we <= '0';
     decoder_pc_prog_we <= '0';
     decoder_normal_prog_we <= '0';
+    decoder_coefficient_fifo_wr_en <= '0';
     
     wait for CLOCK_PERIOD*2;
     rst_i <= '0';
@@ -562,6 +665,9 @@ begin
     wait for CLOCK_PERIOD;
     PROGRAM_PRINCIPAL_COMPONENT("integrator6.rom", "0110", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
     wait for CLOCK_PERIOD;
+    
+    -- FIXME program decoder memory here
+    decoder_coefficient_fifo_wr_en <= '1';
     
     wait for CLOCK_PERIOD*5;
     prog_ok <= '0';

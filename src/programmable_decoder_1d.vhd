@@ -46,7 +46,8 @@ port (
 
 architecture rtl of programmable_decoder_1d is
     signal ack: std_logic;
-    signal ack_state: std_logic := '0'; -- when '0', waiting for (pc_ready & shreg_ready); when '1', waiting for !(pc_ready | shreg_ready)
+    type ack_state_type is (state_wait_for_valid, state_wait_for_deassertion, state_wait_for_shreg, state_wait_for_pc);
+    signal ack_state: ack_state_type := state_wait_for_valid;
     
     component variable_coefficient_decoder generic (
         shift: integer := 0        
@@ -94,26 +95,40 @@ begin
     data_ack <= ack;
 
     ACK_CTRL: process(clk, rst, ack_state, pc_ready, shreg_ready)
-        variable ack_v: std_logic := '0';
+        variable ack_v: std_logic;
     begin
+        ack_v := '0';
         if(rising_edge(clk)) then
             if(rst = '1') then
                 ack_v := '0';
-                ack_state <= '0';
+                ack_state <= state_wait_for_valid;
             else
-                if(ack_state = '0') then
+                case ack_state is
+                when state_wait_for_valid =>
                     if(pc_ready = '1' and shreg_ready = '1') then
                         ack_v := '1';
-                        ack_state <= '1';
+                        ack_state <= state_wait_for_deassertion;
                     end if;
-                else
+                when state_wait_for_deassertion =>
                     if(pc_ready = '0' and shreg_ready = '0') then
-                        ack_state <= '0';
+                        ack_state <= state_wait_for_valid;
+                    elsif(pc_ready = '1' and shreg_ready = '0') then
+                        ack_state <= state_wait_for_pc;
+                    elsif(pc_ready = '0' and shreg_ready = '1') then
+                        ack_state <= state_wait_for_shreg;
                     end if;
-                end if;
+                when state_wait_for_shreg =>
+                    if(shreg_ready = '0') then
+                        ack_state <= state_wait_for_valid;
+                    end if;
+                when state_wait_for_pc =>
+                    if(pc_ready = '0') then
+                        ack_state <= state_wait_for_valid;
+                    end if;
+                end case;
             end if;
-        end if;
-        ack <= ack_v;
+            ack <= ack_v;
+        end if;        
     end process ACK_CTRL;
     
     -- register stage for inputs
@@ -173,9 +188,10 @@ begin
         
     all_done <= write_ctrl_done;
     WRITE_CTRL: process(clk, rst, timestep, decoder_valid, decoded_value, write_ctrl_counter, write_ctrl_stall)
-        variable write_enable: std_logic := '0';
+        variable write_enable: std_logic;
         variable next_counter: unsigned(9 downto 0);
     begin
+        write_enable := '0';
         next_counter := write_ctrl_counter;
         if(rising_edge(clk)) then
             if(rst = '1') then
