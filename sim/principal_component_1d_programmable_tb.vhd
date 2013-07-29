@@ -376,7 +376,125 @@ component decoder_unit_bottom_half_1d generic (
 ); end component;
 signal decoder_bottom_half_all_done: std_logic;
 
-component decoder_fifo   PORT (
+component ddr3_memory_controller_facade generic (
+    SIM_BYPASS_INIT_CAL   : string  := "OFF";
+                                  -- # = "OFF" -  Complete memory init &
+                                  --              calibration sequence
+                                  -- # = "SKIP" - Not supported
+                                  -- # = "FAST" - Complete memory init & use
+                                  --              abbreviated calib sequence
+
+    SIMULATION            : string  := "FALSE";
+                                  -- Should be TRUE during design simulations and
+                                  -- FALSE during implementations
+    USE_FAKE_RAM          : string  := "FALSE"
+                                  -- If TRUE, don't use a DDR3 model but instead use a RAM-backed model
+                                  -- that trades accuracy and realism for simulation speed. Useful for functional verification.                                   
+); port (
+    
+   -- Inouts
+   dq                        : inout std_logic_vector(63 downto 0);
+   dqs_p                     : inout std_logic_vector(7 downto 0);
+   dqs_n                     : inout std_logic_vector(7 downto 0);
+
+   -- Outputs
+   addr                      : out   std_logic_vector(13 downto 0);
+   ba                        : out   std_logic_vector(2 downto 0);
+   ras_n                     : out   std_logic;
+   cas_n                     : out   std_logic;
+   we_n                      : out   std_logic;
+   reset_n                   : out   std_logic;
+   ck_p                      : out   std_logic_vector(0 downto 0);
+   ck_n                      : out   std_logic_vector(0 downto 0);
+   cke                       : out   std_logic_vector(0 downto 0);
+   cs_n                      : out   std_logic_vector(0 downto 0);
+   dm                        : out   std_logic_vector(7 downto 0);
+   odt                       : out   std_logic_vector(0 downto 0);
+
+   -- Inputs
+   -- Differential system clocks
+   sys_clk_p                      : in    std_logic;
+   sys_clk_n                      : in    std_logic;
+   
+   -- user interface signals
+   app_addr             : in    std_logic_vector(27 downto 0);
+   app_cmd              : in    std_logic_vector(2 downto 0);
+   app_en               : in    std_logic;
+   app_wdf_data         : in    std_logic_vector(511 downto 0);
+   app_wdf_end          : in    std_logic;
+   app_wdf_mask         : in    std_logic_vector(63 downto 0)  ;
+   app_wdf_wren         : in    std_logic;
+   app_rd_data          : out   std_logic_vector(511 downto 0);
+   app_rd_data_end      : out   std_logic;
+   app_rd_data_valid    : out   std_logic;
+   app_rdy              : out   std_logic;
+   app_wdf_rdy          : out   std_logic;
+   app_sr_active        : out   std_logic;
+   app_ref_ack          : out   std_logic;
+   app_zq_ack           : out   std_logic;
+   ui_clk               : out   std_logic;
+   ui_clk_sync_rst      : out   std_logic;
+   init_calib_complete  : out std_logic;
+      sys_rst                     : in    std_logic
+); end component ddr3_memory_controller_facade;
+signal clk200_p: std_logic;
+signal clk200_n: std_logic;
+constant CLK200_PERIOD: time := 5 ns;
+signal clk200: std_logic; -- from memory controller
+
+component prefetch_controller generic (
+    N: positive := 33; -- FIFO depth
+    T: positive := 12 -- number of transfers per timeslice
+); port (
+    clk: in std_logic;
+    rst: in std_logic;
+    -- programming interface
+    prog_addr: in std_logic_vector(17 downto 0);
+    prog_we: in std_logic;
+    prog_data: in std_logic_vector(7 downto 0);
+    prog_busy: out std_logic;
+    prog_done: out std_logic;
+    -- decoder FIFO interface
+    fifo_rst: out std_logic;
+    fifo_we: out std_logic;
+    fifo_data: out std_logic_vector(511 downto 0);
+    fifo_count: in std_logic_vector(5 downto 0); -- FIXME check port width
+    -- DDR3 interface
+    ddr3_rst: out std_logic;
+    ddr3_calibration_complete: in std_logic;
+    ddr3_ui_ready: in std_logic;
+    ddr3_addr: out std_logic_vector(27 downto 0);
+    ddr3_cmd: out std_logic_vector(2 downto 0);
+    ddr3_en: out std_logic;
+        
+    ddr3_wdf_data: out std_logic_vector(511 downto 0);
+    ddr3_wdf_we: out std_logic;
+    ddr3_wdf_ready: in std_logic;
+    
+    ddr3_read_data: in std_logic_vector(511 downto 0);
+    ddr3_read_valid: in std_logic
+); end component prefetch_controller;
+signal decoder_prog_addr: std_logic_vector(17 downto 0);
+signal decoder_prog_we: std_logic;
+signal decoder_prog_data: std_logic_vector(7 downto 0);
+signal decoder_prog_busy: std_logic;
+signal decoder_prog_done: std_logic;
+
+    signal ddr3_rst: std_logic;
+    signal ddr3_calibration_complete: std_logic;
+    signal ddr3_ui_ready: std_logic;
+    signal ddr3_addr: std_logic_vector(27 downto 0);
+    signal ddr3_cmd: std_logic_vector(2 downto 0);
+    signal ddr3_en: std_logic;
+        
+    signal ddr3_wdf_data: std_logic_vector(511 downto 0);
+    signal ddr3_wdf_we: std_logic;
+    signal ddr3_wdf_ready: std_logic;
+    
+    signal ddr3_read_data: std_logic_vector(511 downto 0);
+    signal ddr3_read_valid: std_logic;
+
+component decoder_fifo PORT (
     rst : IN STD_LOGIC;
     wr_clk : IN STD_LOGIC;
     rd_clk : IN STD_LOGIC;
@@ -385,13 +503,16 @@ component decoder_fifo   PORT (
     rd_en : IN STD_LOGIC;
     dout : OUT STD_LOGIC_VECTOR(511 DOWNTO 0);
     full : OUT STD_LOGIC;
-    empty : OUT STD_LOGIC
+    empty : OUT STD_LOGIC;
+    wr_data_count : OUT STD_LOGIC_VECTOR(5 DOWNTO 0)
   ); end component;
-signal decoder_coefficient_fifo_din: std_logic_vector(511 downto 0) := (others=>'1');
+signal decoder_coefficient_fifo_rst: std_logic;
+signal decoder_coefficient_fifo_din: std_logic_vector(511 downto 0);
 signal decoder_coefficient_fifo_wr_en: std_logic;
 signal decoder_coefficient_fifo_full: std_logic;
 signal decoder_coefficient_fifo_dout: std_logic_vector(511 downto 0);
 signal decoder_coefficient_fifo_empty: std_logic;
+signal decoder_coefficient_fifo_wr_data_count: std_logic_vector(5 downto 0);
 
 component shift_controller generic (
     N: natural := 1; -- number of acknowledge lines
@@ -426,6 +547,20 @@ begin
         wait for CLOCK_PERIOD/2;
     end loop;
 end process CLKGEN;
+
+CLK200GEN: process
+begin
+    clk200_p <= '0';
+    clk200_n <= '1';
+    loop
+        clk200_p <= '0';
+        clk200_n <= '1';
+        wait for CLK200_PERIOD/2;
+        clk200_p <= '1';
+        clk200_n <= '0';
+        wait for CLK200_PERIOD/2;        
+    end loop;
+end process CLK200GEN;
 
 SYS_RST: reset_controller port map (
     clk => clk,
@@ -558,12 +693,89 @@ decoder_u <= to_slv(h1_y);
 decoder_empty <= '1' when h1_ready = '0' else '0';
 h1_ack <= decoder_rd_en;
 
+DDR3: ddr3_memory_controller_facade generic map (
+    SIM_BYPASS_INIT_CAL => "FAST",
+    SIMULATION => "TRUE",
+    USE_FAKE_RAM => "FALSE"
+) port map (
+    -- DDR3
+    dq => open,
+    dqs_p => open,
+    dqs_n => open,
+    addr => open,
+    ba => open,
+    ras_n => open,
+    cas_n => open,
+    we_n => open,
+    reset_n => open,
+    ck_p => open,
+    ck_n => open,
+    cke => open,
+    cs_n => open,
+    dm => open,
+    odt => open,    
+    -- UI
+    sys_clk_p => clk200_p,
+    sys_clk_n => clk200_n,
+    app_addr => ddr3_addr,
+    app_cmd => ddr3_cmd,
+    app_en => ddr3_en,
+    app_wdf_data => ddr3_wdf_data,
+    app_wdf_end => '1',
+    app_wdf_mask => (others=>'0'),
+    app_wdf_wren => ddr3_wdf_we,
+    app_rd_data => ddr3_read_data,
+    app_rd_data_end => open,
+    app_rd_data_valid => ddr3_read_valid,
+    app_rdy => ddr3_ui_ready,
+    app_wdf_rdy => ddr3_wdf_ready,
+    app_sr_active => open,
+    app_ref_ack => open,
+    app_zq_ack => open,
+    ui_clk => clk200,
+    ui_clk_sync_rst => open,
+    init_calib_complete => ddr3_calibration_complete,
+    sys_rst => rst -- FIXME wrong clock domain
+);
+
+PREFETCH_CTL: prefetch_controller generic map (
+    N => 33,
+    T => 12
+) port map (
+    clk => clk,
+    rst => rst,
+    -- prog
+    prog_addr => decoder_prog_addr,
+    prog_we => decoder_prog_we,
+    prog_data => decoder_prog_data,
+    prog_busy => decoder_prog_busy,
+    prog_done => decoder_prog_done,
+    -- fifo
+    fifo_rst => decoder_coefficient_fifo_rst,
+    fifo_we => decoder_coefficient_fifo_wr_en,
+    fifo_data => decoder_coefficient_fifo_din,
+    fifo_count => decoder_coefficient_fifo_wr_data_count,
+    -- ddr3
+    ddr3_rst => ddr3_rst,
+    ddr3_calibration_complete => ddr3_calibration_complete,
+    ddr3_ui_ready => ddr3_ui_ready,
+    ddr3_addr => ddr3_addr,
+    ddr3_cmd => ddr3_cmd,
+    ddr3_en => ddr3_en,
+    ddr3_wdf_data => ddr3_wdf_data,
+    ddr3_wdf_we => ddr3_wdf_we,
+    ddr3_wdf_ready => ddr3_wdf_ready,
+    ddr3_read_data => ddr3_read_data,
+    ddr3_read_valid => ddr3_read_valid 
+);
+
 DECODER_COEFFICIENT_FIFO: decoder_fifo port map (
-    rst => rst,    
+    rst => decoder_coefficient_fifo_rst,    
     wr_clk => clk,
     din => decoder_coefficient_fifo_din,
     wr_en => decoder_coefficient_fifo_wr_en,
-    full => decoder_coefficient_fifo_full, 
+    full => decoder_coefficient_fifo_full,
+    wr_data_count => decoder_coefficient_fifo_wr_data_count,
     
     rd_clk => clk,
     dout => decoder_coefficient_fifo_dout,
@@ -633,7 +845,6 @@ begin
     h1_prog_we <= '0';
     decoder_pc_prog_we <= '0';
     decoder_normal_prog_we <= '0';
-    decoder_coefficient_fifo_wr_en <= '0';
     
     wait for CLOCK_PERIOD*2;
     rst_i <= '0';
