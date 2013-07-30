@@ -61,6 +61,7 @@ type state_type is (state_reset, state_wait_for_ddr3, state_prefetch);
 type ci_type is record
     state: state_type;
     ddr3_rst: std_logic;
+    fifo_rst: std_logic;
     timeslice: unsigned(9 downto 0);
     xferno: unsigned(7 downto 0);
     prefetch_invalidate: std_logic;
@@ -73,6 +74,7 @@ end record;
 constant reg_reset: ci_type := (
     state => state_reset,
     ddr3_rst => '0',
+    fifo_rst => '0',
     timeslice => (others=>'0'),
     xferno => (others=>'0'),
     prefetch_invalidate => '1',
@@ -112,6 +114,8 @@ ddr3_addr <= reg.ddr3_addr;
 ddr3_cmd <= reg.ddr3_cmd;
 ddr3_en <= reg.ddr3_en;
 
+fifo_rst <= reg.fifo_rst;
+
 COMB: process(reg, rst, ddr3_calibration_complete, ddr3_ui_ready, outstanding_read_count, fifo_count)
     variable ci: ci_type;
     variable reserved_read_count: unsigned(6 downto 0);
@@ -120,6 +124,7 @@ begin
     reserved_read_count := outstanding_read_count + unsigned("0" & fifo_count);
     -- self-clearing signals
     ci.ddr3_rst := '0';
+    ci.fifo_rst := '0';
     ci.issue_read := '0';
     ci.ddr3_en := '0';
     
@@ -129,6 +134,7 @@ begin
         case reg.state is
             when state_reset =>
                 ci.ddr3_rst := '1';
+                ci.fifo_rst := '1';
                 ci.state := state_wait_for_ddr3;
             when state_wait_for_ddr3 =>
                 if(ddr3_calibration_complete = '1' and ddr3_ui_ready = '1') then

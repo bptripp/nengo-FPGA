@@ -742,7 +742,7 @@ PREFETCH_CTL: prefetch_controller generic map (
     N => 33,
     T => 12
 ) port map (
-    clk => clk,
+    clk => clk200,
     rst => rst,
     -- prog
     prog_addr => decoder_prog_addr,
@@ -771,7 +771,7 @@ PREFETCH_CTL: prefetch_controller generic map (
 
 DECODER_COEFFICIENT_FIFO: decoder_fifo port map (
     rst => decoder_coefficient_fifo_rst,    
-    wr_clk => clk,
+    wr_clk => clk200,
     din => decoder_coefficient_fifo_din,
     wr_en => decoder_coefficient_fifo_wr_en,
     full => decoder_coefficient_fifo_full,
@@ -879,9 +879,6 @@ begin
     wait for CLOCK_PERIOD;
     PROGRAM_PRINCIPAL_COMPONENT("integrator6.rom", "0110", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
     wait for CLOCK_PERIOD;
-    
-    -- FIXME program decoder memory here
-    decoder_coefficient_fifo_wr_en <= '1';
     
     wait for CLOCK_PERIOD*5;
     prog_ok <= '0';
