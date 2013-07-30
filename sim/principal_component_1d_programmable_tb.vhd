@@ -442,6 +442,41 @@ signal clk200_n: std_logic;
 constant CLK200_PERIOD: time := 5 ns;
 signal clk200: std_logic; -- from memory controller
 
+component decoder_marshal_unit port (
+    clk: in std_logic;
+    rst: in std_logic;
+    addr: in std_logic_vector(17 downto 0);
+    we: in std_logic;
+    data: in std_logic_vector(7 downto 0);
+    busy: out std_logic; -- pretty much exactly fifo_full
+    -- FIFO
+    -- write pattern: addr hi(9), addr lo(9), 64x data(8)
+    fifo_rst: out std_logic;
+    fifo_din: out std_logic_vector(8 downto 0);
+    fifo_we: out std_logic;
+    fifo_prog_full: in std_logic -- assumed to be at capacity-4
+); end component decoder_marshal_unit;
+signal decoder_prog_addr: std_logic_vector(17 downto 0);
+signal decoder_prog_we: std_logic;
+signal decoder_prog_data: std_logic_vector(7 downto 0);
+signal decoder_marshal_fifo_rst: std_logic;
+signal decoder_marshal_fifo_din: std_logic_vector(8 downto 0);
+signal decoder_marshal_fifo_we: std_logic;
+signal decoder_marshal_fifo_prog_full: std_logic;
+
+component decoder_marshalled_fifo  PORT (
+    rst : IN STD_LOGIC;
+    wr_clk : IN STD_LOGIC;
+    rd_clk : IN STD_LOGIC;
+    din : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
+    wr_en : IN STD_LOGIC;
+    rd_en : IN STD_LOGIC;
+    dout : OUT STD_LOGIC_VECTOR(8 DOWNTO 0);
+    full : OUT STD_LOGIC;
+    empty : OUT STD_LOGIC;
+    prog_full : OUT STD_LOGIC
+  ); end component decoder_marshalled_fifo;
+  
 component prefetch_controller generic (
     N: positive := 33; -- FIFO depth
     T: positive := 12 -- number of transfers per timeslice
@@ -474,9 +509,6 @@ component prefetch_controller generic (
     ddr3_read_data: in std_logic_vector(511 downto 0);
     ddr3_read_valid: in std_logic
 ); end component prefetch_controller;
-signal decoder_prog_addr: std_logic_vector(17 downto 0);
-signal decoder_prog_we: std_logic;
-signal decoder_prog_data: std_logic_vector(7 downto 0);
 signal decoder_prog_busy: std_logic;
 signal decoder_prog_done: std_logic;
 
@@ -738,6 +770,32 @@ DDR3: ddr3_memory_controller_facade generic map (
     sys_rst => rst -- FIXME wrong clock domain
 );
 
+DECODER_MARSHAL: decoder_marshal_unit port map (
+    clk => clk,
+    rst => rst,
+    addr => decoder_prog_addr,
+    we => decoder_prog_we,
+    data => decoder_prog_data,
+    busy => decoder_prog_busy,
+    fifo_rst => decoder_marshal_fifo_rst,
+    fifo_din => decoder_marshal_fifo_din,
+    fifo_we => decoder_marshal_fifo_we,
+    fifo_prog_full => decoder_marshal_fifo_prog_full
+);
+
+MARSHALLED_FIFO: decoder_marshalled_fifo port map (
+    rst => decoder_marshal_fifo_rst,
+    wr_clk => clk,
+    rd_clk => clk200,
+    din => decoder_marshal_fifo_din,
+    wr_en => decoder_marshal_fifo_we,
+    rd_en => '0', -- FIXME
+    dout => open,
+    full => open,
+    empty => open,
+    prog_full => decoder_marshal_fifo_prog_full
+);
+
 PREFETCH_CTL: prefetch_controller generic map (
     N => 33,
     T => 12
@@ -745,11 +803,11 @@ PREFETCH_CTL: prefetch_controller generic map (
     clk => clk200,
     rst => rst,
     -- prog
-    prog_addr => decoder_prog_addr,
-    prog_we => decoder_prog_we,
-    prog_data => decoder_prog_data,
-    prog_busy => decoder_prog_busy,
-    prog_done => decoder_prog_done,
+    prog_addr => (others=>'0'), -- FIXME connect to unmarshal unit
+    prog_we => '0',
+    prog_data => (others=>'0'),
+    prog_busy => open, -- FIXME should no longer be necessary
+    prog_done => decoder_prog_done, -- FIXME remove
     -- fifo
     fifo_rst => decoder_coefficient_fifo_rst,
     fifo_we => decoder_coefficient_fifo_wr_en,
@@ -883,13 +941,15 @@ begin
     PROGRAM_PRINCIPAL_COMPONENT("integrator6.rom", "0110", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
     wait for CLOCK_PERIOD;
     
-    -- temporarily cheating...we need a way to synchronize the datapath here from clk (125 MHz) to clk200 (200 MHz)
     decoder_prog_addr <= (others=>'1');
     decoder_prog_data <= (others=>'1');
-    wait until falling_edge(clk200);
     for I in 0 to 63 loop
+        decoder_prog_we <= '0';
+        if(decoder_prog_busy = '1') then
+            wait until decoder_prog_busy = '0';
+        end if;
         decoder_prog_we <= '1';
-        wait for CLK200_PERIOD;        
+        wait for CLOCK_PERIOD;        
     end loop;
     decoder_prog_we <= '0';
     
