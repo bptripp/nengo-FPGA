@@ -696,7 +696,7 @@ h1_ack <= decoder_rd_en;
 DDR3: ddr3_memory_controller_facade generic map (
     SIM_BYPASS_INIT_CAL => "FAST",
     SIMULATION => "TRUE",
-    USE_FAKE_RAM => "FALSE"
+    USE_FAKE_RAM => "TRUE"
 ) port map (
     -- DDR3
     dq => open,
@@ -846,6 +846,9 @@ begin
     decoder_pc_prog_we <= '0';
     decoder_normal_prog_we <= '0';
     
+    decoder_prog_we <= '0';
+    
+    wait until falling_edge(clk);
     wait for CLOCK_PERIOD*2;
     rst_i <= '0';
     wait until rst_done = '1';
@@ -880,6 +883,17 @@ begin
     PROGRAM_PRINCIPAL_COMPONENT("integrator6.rom", "0110", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
     wait for CLOCK_PERIOD;
     
+    -- temporarily cheating...we need a way to synchronize the datapath here from clk (125 MHz) to clk200 (200 MHz)
+    decoder_prog_addr <= (others=>'1');
+    decoder_prog_data <= (others=>'1');
+    wait until falling_edge(clk200);
+    for I in 0 to 63 loop
+        decoder_prog_we <= '1';
+        wait for CLK200_PERIOD;        
+    end loop;
+    decoder_prog_we <= '0';
+    
+    wait until falling_edge(clk);
     wait for CLOCK_PERIOD*5;
     prog_ok <= '0';
     timestep <= '1';

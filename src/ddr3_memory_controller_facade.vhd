@@ -542,7 +542,24 @@ component ddr3_sodimm_sim port (
     odt: in std_logic;
     init_calib_complete: in std_logic
 ); end component ddr3_sodimm_sim;
+
 signal calib_done: std_logic;
+
+signal FakeRAM: std_logic_vector(511 downto 0) := (others=>'1');
+signal FakeRAM_dout: std_logic_vector(511 downto 0);
+signal FakeRAM_valid: std_logic;
+signal fake_calibration_count: unsigned(9 downto 0) := (others=>'1');
+
+component delay_line generic (
+    N: natural := 1; -- port width
+    T: natural := 0
+); port (
+    clk: in std_logic;
+    d: in std_logic_vector(N-1 downto 0);
+    q: out std_logic_vector(N-1 downto 0)
+); end component delay_line;
+
+
 
 begin
 
@@ -632,6 +649,65 @@ end generate DDR3_SIMULATION_MODEL;
 end generate REAL_DDR3;
 
 FAKE_DDR3: if (USE_FAKE_RAM = "TRUE") generate
+    -- derived clock
+    ui_clk <= sys_clk_p;
+    -- FIXME might want to wait for a reset before asserting these
+    
+    FAKE_CALIBRATION: process(sys_clk_p, sys_rst, fake_calibration_count)
+    begin
+        if(rising_edge(sys_clk_p)) then
+            if(sys_rst = '1') then
+                fake_calibration_count <= (others=>'1');
+                app_rdy <= '0';
+                app_wdf_rdy <= '0';
+                init_calib_complete <= '0';
+            elsif(fake_calibration_count = "0000000000") then
+                app_rdy <= '1';
+                app_wdf_rdy <= '1';
+                init_calib_complete <= '1';
+            else
+                fake_calibration_count <= fake_calibration_count - X"1";
+                app_rdy <= '0';
+                app_wdf_rdy <= '0';
+                init_calib_complete <= '0';
+            end if;
+        end if;
+    end process FAKE_CALIBRATION;
+    
+FAKE_RAM_BEHAVIOUR: process(sys_clk_p, app_cmd, app_en, app_wdf_data, app_wdf_wren, FakeRAM)
+    variable valid: std_logic; -- read qualifier
+begin        valid := '0';
+    if(rising_edge(sys_clk_p)) then
+        if(app_en = '1') then
+            if(app_cmd = "001") then -- read
+                FakeRAM_dout <= FakeRAM;
+                valid := '1';
+            elsif(app_cmd = "000" and app_wdf_wren = '1') then -- write
+                -- slightly cheating as we ignore app_wdf_end and app_wdf_mask
+                FakeRAM <= app_wdf_data;
+            end if;
+        end if;
+        FakeRAM_valid <= valid;
+    end if;
+end process FAKE_RAM_BEHAVIOUR;
+
+    DELAY_DOUT: delay_line generic map (
+        N => 512,
+        T => 50 -- approximately right from DDR3 simulation
+    ) port map (
+        clk => sys_clk_p,
+        d => FakeRAM_dout,
+        q => app_rd_data
+    );
+    DELAY_VALID: delay_line generic map (
+        N => 1,
+        T => 50 -- MAKE SURE this is the same as the previous one!
+    ) port map (
+        clk => sys_clk_p,
+        d(0) => FakeRAM_valid,
+        q(0) => app_rd_data_valid
+    );
+
 end generate FAKE_DDR3;
 
 end architecture Behavioural;

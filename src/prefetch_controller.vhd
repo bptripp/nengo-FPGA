@@ -57,7 +57,7 @@ component prefetch_count_monitor port (
 ); end component prefetch_count_monitor;
 signal outstanding_read_count: unsigned(5 downto 0);
 
-type state_type is (state_reset, state_wait_for_ddr3, state_prefetch);
+type state_type is (state_reset, state_wait_for_ddr3, state_prefetch, state_programming, state_write_to_ddr3);
 type ci_type is record
     state: state_type;
     ddr3_rst: std_logic;
@@ -69,6 +69,11 @@ type ci_type is record
     ddr3_addr: std_logic_vector(27 downto 0);
     ddr3_cmd: std_logic_vector(2 downto 0);
     ddr3_en: std_logic;
+    prog_busy: std_logic;
+    prog_done: std_logic;
+    prog_target_data: std_logic_vector(511 downto 0);
+    prog_count: unsigned(5 downto 0);
+    ddr3_wdf_we: std_logic;
 end record;
 
 constant reg_reset: ci_type := (
@@ -81,7 +86,12 @@ constant reg_reset: ci_type := (
     issue_read => '0',
     ddr3_addr => (others=>'0'),
     ddr3_cmd => (others=>'0'),
-    ddr3_en => '0'
+    ddr3_en => '0',
+    prog_busy => '1',
+    prog_done => '0',
+    prog_target_data => (others=>'0'),
+    prog_count => (others=>'0'),
+    ddr3_wdf_we => '0'
 );
 
 constant LAST_XFERNO: unsigned(7 downto 0) := to_unsigned(T-1, 8);
@@ -114,9 +124,16 @@ ddr3_addr <= reg.ddr3_addr;
 ddr3_cmd <= reg.ddr3_cmd;
 ddr3_en <= reg.ddr3_en;
 
+ddr3_wdf_data <= reg.prog_target_data;
+ddr3_wdf_we <= reg.ddr3_wdf_we;
+
 fifo_rst <= reg.fifo_rst;
 
-COMB: process(reg, rst, ddr3_calibration_complete, ddr3_ui_ready, outstanding_read_count, fifo_count)
+prog_busy <= reg.prog_busy;
+prog_done <= reg.prog_done;
+
+COMB: process(reg, rst, ddr3_calibration_complete, ddr3_ui_ready, outstanding_read_count, fifo_count,
+              prog_addr, prog_we, prog_data, ddr3_wdf_ready)
     variable ci: ci_type;
     variable reserved_read_count: unsigned(6 downto 0);
 begin
@@ -127,6 +144,8 @@ begin
     ci.fifo_rst := '0';
     ci.issue_read := '0';
     ci.ddr3_en := '0';
+    ci.prog_done := '0';
+    ci.ddr3_wdf_we := '0';
     
     if(rst = '1') then
         ci := reg_reset;
@@ -140,9 +159,24 @@ begin
                 if(ddr3_calibration_complete = '1' and ddr3_ui_ready = '1') then
                     ci.state := state_prefetch;
                     ci.prefetch_invalidate := '0';
+                    ci.prog_busy := '0';
                 end if;
             when state_prefetch =>
-                if(reserved_read_count < N and ddr3_ui_ready = '1') then
+                if(prog_we = '1') then
+                    -- suspend normal operation
+                    ci.state := state_programming;
+                    ci.timeslice := (others=>'0');
+                    ci.xferno := (others=>'0');
+                    -- start by invalidating FIFO contents and all pending reads
+                    ci.prefetch_invalidate := '1';
+                    ci.fifo_rst := '1';
+                    -- latch address and start shifting in data.
+                    -- 10 highest bits are timeslice; 8 lowest bits are transfer number                    
+                    ci.ddr3_addr := virt2phys(unsigned(prog_addr(17 downto 8)), unsigned(prog_addr(7 downto 0)));
+                    ci.prog_target_data(7 downto 0) := prog_data;
+                    ci.prog_target_data(511 downto 8) := (others=>'0');
+                    ci.prog_count := "000001";
+                elsif(reserved_read_count < N and ddr3_ui_ready = '1') then
                     -- issue the read
                     ci.ddr3_addr := virt2phys(reg.timeslice, reg.xferno);
                     ci.ddr3_cmd := "001"; -- UG586 says this is the Read command
@@ -155,6 +189,33 @@ begin
                     else
                         ci.xferno := reg.xferno + X"1";
                     end if;
+                end if;
+            when state_programming =>
+                if(prog_we = '1') then
+                    -- shift in prog_data
+                    for I in 1 to 63 loop
+                        ci.prog_target_data(8*I+7 downto 8*I) := reg.prog_target_data(8*(I-1)+7 downto 8*(I-1));
+                    end loop;
+                    ci.prog_target_data(7 downto 0) := prog_data;
+                    ci.prog_count := reg.prog_count + X"1";
+                    if(reg.prog_count = "111111") then -- we just programmed 64 times, so go to the next phase
+                        ci.state := state_write_to_ddr3;
+                    end if;
+                end if;
+            when state_write_to_ddr3 =>
+                if(ddr3_wdf_ready = '1' and ddr3_ui_ready = '1' and outstanding_read_count = "000000") then
+                    -- okay to issue write;
+                    -- address and data are already connected
+                    ci.ddr3_cmd := "000"; -- UG586 says this is the Write command
+                    ci.ddr3_en := '1';
+                    ci.ddr3_wdf_we := '1';
+                    -- assuming a strict ordering of memory controller commands,
+                    -- we can begin issuing reads again because we guarantee that
+                    -- this write will complete before reading the memory,
+                    -- therefore avoiding RAW hazards
+                    ci.prog_done := '1';
+                    ci.prefetch_invalidate := '0';
+                    ci.state := state_prefetch;
                 end if;
         end case;
     end if;
