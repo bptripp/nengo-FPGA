@@ -477,6 +477,27 @@ component decoder_marshalled_fifo  PORT (
     prog_full : OUT STD_LOGIC
   ); end component decoder_marshalled_fifo;
   
+  signal decoder_marshal_fifo_dout: std_logic_vector(8 downto 0);
+  signal decoder_marshal_fifo_re: std_logic;
+  signal decoder_marshal_fifo_empty: std_logic;
+  
+    component decoder_unmarshal_unit port (
+      clk: in std_logic;
+      rst: in std_logic;
+      fifo_dout: in std_logic_vector(8 downto 0); -- assuming FWFT
+      fifo_re: out std_logic;
+      fifo_empty: in std_logic;
+      -- prefetch
+      prefetch_addr: out std_logic_vector(17 downto 0);
+      prefetch_we: out std_logic;
+      prefetch_data: out std_logic_vector(7 downto 0);
+      prefetch_busy: in std_logic
+  ); end component decoder_unmarshal_unit;  
+  signal decoder_unmarshal_addr: std_logic_vector(17 downto 0);
+  signal decoder_unmarshal_we: std_logic;
+  signal decoder_unmarshal_data: std_logic_vector(7 downto 0);
+  signal decoder_unmarshal_busy: std_logic;
+   
 component prefetch_controller generic (
     N: positive := 33; -- FIFO depth
     T: positive := 12 -- number of transfers per timeslice
@@ -789,11 +810,24 @@ MARSHALLED_FIFO: decoder_marshalled_fifo port map (
     rd_clk => clk200,
     din => decoder_marshal_fifo_din,
     wr_en => decoder_marshal_fifo_we,
-    rd_en => '0', -- FIXME
-    dout => open,
+    rd_en => decoder_marshal_fifo_re, 
+    dout => decoder_marshal_fifo_dout,
     full => open,
-    empty => open,
+    empty => decoder_marshal_fifo_empty,
     prog_full => decoder_marshal_fifo_prog_full
+);
+
+DECODER_UNMARSHAL: decoder_unmarshal_unit port map (
+    clk => clk200,
+    rst => rst, -- FIXME wrong clock domain
+    fifo_dout => decoder_marshal_fifo_dout,
+    fifo_re => decoder_marshal_fifo_re,
+    fifo_empty => decoder_marshal_fifo_empty,
+    -- prefetch
+    prefetch_addr => decoder_unmarshal_addr,
+    prefetch_we => decoder_unmarshal_we,
+    prefetch_data => decoder_unmarshal_data,
+    prefetch_busy => decoder_unmarshal_busy
 );
 
 PREFETCH_CTL: prefetch_controller generic map (
@@ -801,12 +835,12 @@ PREFETCH_CTL: prefetch_controller generic map (
     T => 12
 ) port map (
     clk => clk200,
-    rst => rst,
+    rst => rst, -- FIXME wrong clock domain
     -- prog
-    prog_addr => (others=>'0'), -- FIXME connect to unmarshal unit
-    prog_we => '0',
-    prog_data => (others=>'0'),
-    prog_busy => open, -- FIXME should no longer be necessary
+    prog_addr => decoder_unmarshal_addr,
+    prog_we => decoder_unmarshal_we,
+    prog_data => decoder_unmarshal_data,
+    prog_busy => decoder_unmarshal_busy,
     prog_done => decoder_prog_done, -- FIXME remove
     -- fifo
     fifo_rst => decoder_coefficient_fifo_rst,
