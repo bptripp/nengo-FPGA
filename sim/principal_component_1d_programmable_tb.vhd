@@ -515,6 +515,8 @@ component prefetch_controller generic (
     fifo_we: out std_logic;
     fifo_data: out std_logic_vector(511 downto 0);
     fifo_count: in std_logic_vector(5 downto 0); -- FIXME check port width
+    
+    shctl_invalidate: out std_logic;
     -- DDR3 interface
     ddr3_rst: out std_logic;
     ddr3_calibration_complete: in std_logic;
@@ -574,6 +576,7 @@ component shift_controller generic (
 port (
     clk: in std_logic;
     rst: in std_logic;
+    invalidate: in std_logic;
     fifo_data: in std_logic_vector(511 downto 0);
     fifo_empty: in std_logic;
     fifo_rd_en: out std_logic;
@@ -586,7 +589,8 @@ signal shift_fifo_rd_en: std_logic;
 signal shift_data: std_logic_vector(511 downto 0);
 signal shift_clear: std_logic;
 signal shift_en: std_logic;
-signal shift_ack: std_logic_vector(0 downto 0) := (others=>'0'); -- FIXME
+signal shift_ack: std_logic_vector(0 downto 0);
+signal shctl_invalidate: std_logic;
 
 begin
 
@@ -847,6 +851,8 @@ PREFETCH_CTL: prefetch_controller generic map (
     fifo_we => decoder_coefficient_fifo_wr_en,
     fifo_data => decoder_coefficient_fifo_din,
     fifo_count => decoder_coefficient_fifo_wr_data_count,
+    
+    shctl_invalidate => shctl_invalidate,
     -- ddr3
     ddr3_rst => ddr3_rst,
     ddr3_calibration_complete => ddr3_calibration_complete,
@@ -881,6 +887,7 @@ SHIFT_CTL: shift_controller generic map (
 ) port map (
     clk => clk,
     rst => rst,
+    invalidate => shctl_invalidate,
     fifo_data => decoder_coefficient_fifo_dout,
     fifo_empty => decoder_coefficient_fifo_empty,
     fifo_rd_en => shift_fifo_rd_en,
@@ -982,6 +989,7 @@ begin
         if(decoder_prog_busy = '1') then
             wait until decoder_prog_busy = '0';
         end if;
+        wait until falling_edge(clk);
         decoder_prog_we <= '1';
         wait for CLOCK_PERIOD;        
     end loop;

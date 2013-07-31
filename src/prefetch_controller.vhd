@@ -19,6 +19,9 @@ entity prefetch_controller is generic (
     fifo_we: out std_logic;
     fifo_data: out std_logic_vector(511 downto 0);
     fifo_count: in std_logic_vector(5 downto 0); -- FIXME check port width
+    
+    shctl_invalidate: out std_logic;
+    
     -- DDR3 interface
     ddr3_rst: out std_logic;
     ddr3_calibration_complete: in std_logic;
@@ -131,6 +134,8 @@ fifo_rst <= reg.fifo_rst;
 
 prog_busy <= reg.prog_busy;
 prog_done <= reg.prog_done;
+
+shctl_invalidate <= reg.prefetch_invalidate;
 
 COMB: process(reg, rst, ddr3_calibration_complete, ddr3_ui_ready, outstanding_read_count, fifo_count,
               prog_addr, prog_we, prog_data, ddr3_wdf_ready)

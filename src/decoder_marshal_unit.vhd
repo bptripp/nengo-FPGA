@@ -53,16 +53,21 @@ begin
     fifo_din <= reg.fifo_data;
     fifo_we <= reg.fifo_we;
 
-    DELAY: process(clk, we, data, delayed_we_1, delayed_data_1)
+    DELAY: process(clk, delayed_we_1, delayed_data_1)
     begin
         if(rising_edge(clk)) then
-            delayed_we <= delayed_we_1;
-            delayed_we_1 <= we;
-        
+            delayed_we <= delayed_we_1;       
             delayed_data <= delayed_data_1;
-            delayed_data_1 <= data;
         end if;
     end process DELAY;
+    
+    DELAY1: process(clk, we, data)
+    begin
+        if(rising_edge(clk)) then
+            delayed_we_1 <= we;
+            delayed_data_1 <= data;
+        end if;
+    end process DELAY1;
 
     COMB: process(reg, rst, addr, we, data, fifo_prog_full, delayed_we, delayed_data)
         variable ci: ci_type;

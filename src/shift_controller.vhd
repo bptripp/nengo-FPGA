@@ -10,6 +10,7 @@ generic (
 port (
     clk: in std_logic;
     rst: in std_logic;
+    invalidate: in std_logic;
     fifo_data: in std_logic_vector(511 downto 0);
     fifo_empty: in std_logic;
     fifo_rd_en: out std_logic;
@@ -34,7 +35,7 @@ architecture rtl of shift_controller is
         data => (others=>'0'),
         en => '0',
         read_strobe => '0',
-        clear => '0',
+        clear => '1',
         ack => (others=>'0')
     );
     signal reg: ci_type;
@@ -46,14 +47,14 @@ shift_data <= reg.data;
 shift_clear <= reg.clear;
 shift_en <= reg.en;
 
-COMB: process(clk, reg, rst, fifo_data, fifo_empty, shift_ack)
+COMB: process(clk, reg, rst, invalidate, fifo_data, fifo_empty, shift_ack)
     variable ci: ci_type;
     variable next_shift_count: unsigned(7 downto 0);
 begin
     ci := reg;
     -- self-clearing flags
     ci.en := '0';
-    ci.read_strobe := '0';
+    ci.read_strobe := '1'; -- assume we can always read
     ci.clear := '0';
     
     if(reg.shift_count = X"00") then
@@ -65,14 +66,16 @@ begin
     -- automatically accumulate asserted ack signals
     ci.ack := reg.ack OR shift_ack;
     
-    if(rst = '1') then
+    if(rst = '1' or invalidate = '1') then
         ci := reg_reset;
     else
         if(reg.shift_count = X"00") then
+            ci.read_strobe := '0'; -- don't read while waiting for acknowledge
             if(reg.ack = ACK_ALL_ONES) then
                 ci.clear := '1';
                 ci.shift_count := C;
                 ci.ack := (others=>'0');
+                ci.read_strobe := '1'; -- start reading again
             end if;
         else    
             if(fifo_empty = '0') then
