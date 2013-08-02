@@ -563,7 +563,7 @@ component delay_line generic (
 
 begin
 
-REAL_DDR3: if (USE_FAKE_RAM = "FALSE") generate
+--REAL_DDR3: if (USE_FAKE_RAM = "FALSE") generate
 
 REAL_MEMORY_CONTROLLER: ddr3_memory_controller generic map (
     SIM_BYPASS_INIT_CAL => SIM_BYPASS_INIT_CAL,
@@ -625,7 +625,7 @@ init_calib_complete  => calib_done,
 );
 init_calib_complete <= calib_done;
 
-DDR3_SIMULATION_MODEL: if (SIMULATION = "TRUE") generate
+--DDR3_SIMULATION_MODEL: if (SIMULATION = "TRUE") generate
 SODIMM: ddr3_sodimm_sim port map (
     rst_n => ddr3_reset_n,
     ck => ddr3_ck_p(0),
@@ -644,9 +644,9 @@ SODIMM: ddr3_sodimm_sim port map (
     odt => ddr3_odt(0),
     init_calib_complete => calib_done
 );
-end generate DDR3_SIMULATION_MODEL;
+--end generate DDR3_SIMULATION_MODEL;
 
-end generate REAL_DDR3;
+--end generate REAL_DDR3;
 
 FAKE_DDR3: if (USE_FAKE_RAM = "TRUE") generate
     -- derived clock

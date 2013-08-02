@@ -753,7 +753,7 @@ h1_ack <= decoder_rd_en;
 DDR3: ddr3_memory_controller_facade generic map (
     SIM_BYPASS_INIT_CAL => "FAST",
     SIMULATION => "TRUE",
-    USE_FAKE_RAM => "TRUE"
+    USE_FAKE_RAM => "FALSE"
 ) port map (
     -- DDR3
     dq => open,

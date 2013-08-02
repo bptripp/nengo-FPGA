@@ -1,0 +1,8 @@
+*.vho
+*.xdc
+*.xml
+*.tcl
+*.vhd
+synth/*
+
+gig_ethernet_pcs_pma_v13_0/*

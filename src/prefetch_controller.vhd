@@ -148,9 +148,10 @@ begin
     ci.ddr3_rst := '0';
     ci.fifo_rst := '0';
     ci.issue_read := '0';
-    ci.ddr3_en := '0';
+    ci.ddr3_en := '1'; -- FIXME, TEMPORARILY CHEATING TO PROVE A POINT.
     ci.prog_done := '0';
     ci.ddr3_wdf_we := '0';
+          
     
     if(rst = '1') then
         ci := reg_reset;
@@ -159,19 +160,24 @@ begin
             when state_reset =>
                 ci.ddr3_rst := '1';
                 ci.fifo_rst := '1';
+                ci.ddr3_en := '0';
                 ci.state := state_wait_for_ddr3;
             when state_wait_for_ddr3 =>
+                ci.ddr3_en := '0';
                 if(ddr3_calibration_complete = '1' and ddr3_ui_ready = '1') then
                     ci.state := state_prefetch;
                     ci.prefetch_invalidate := '0';
                     ci.prog_busy := '0';
                 end if;
             when state_prefetch =>
+                ci.ddr3_addr := virt2phys(reg.timeslice, reg.xferno);
+                ci.ddr3_cmd := "001"; -- UG586 says this is the Read command
                 if(prog_we = '1') then
                     -- suspend normal operation
                     ci.state := state_programming;
                     ci.timeslice := (others=>'0');
                     ci.xferno := (others=>'0');
+                    ci.ddr3_en := '0';
                     -- start by invalidating FIFO contents and all pending reads
                     ci.prefetch_invalidate := '1';
                     ci.fifo_rst := '1';
@@ -181,11 +187,13 @@ begin
                     ci.prog_target_data(7 downto 0) := prog_data;
                     ci.prog_target_data(511 downto 8) := (others=>'0');
                     ci.prog_count := "000001";
-                elsif(reserved_read_count < N and ddr3_ui_ready = '1') then
-                    -- issue the read
-                    ci.ddr3_addr := virt2phys(reg.timeslice, reg.xferno);
-                    ci.ddr3_cmd := "001"; -- UG586 says this is the Read command
-                    ci.ddr3_en := '1';
+                end if;
+                if(reserved_read_count >= N) then
+                    -- do not send any commands while the FIFO is full.
+                    ci.ddr3_en := '0';
+                elsif(ddr3_ui_ready = '1' and reg.ddr3_en = '1') then
+                    -- a read has just been accepted
+                    ci.ddr3_en := '0';
                     ci.issue_read := '1';
                     -- increment loop counters
                     if(reg.xferno = LAST_XFERNO) then
@@ -195,7 +203,8 @@ begin
                         ci.xferno := reg.xferno + X"1";
                     end if;
                 end if;
-            when state_programming =>
+            when state_programming => 
+                ci.ddr3_en := '0';
                 if(prog_we = '1') then
                     -- shift in prog_data
                     for I in 1 to 63 loop
@@ -204,16 +213,19 @@ begin
                     ci.prog_target_data(7 downto 0) := prog_data;
                     ci.prog_count := reg.prog_count + X"1";
                     if(reg.prog_count = "111111") then -- we just programmed 64 times, so go to the next phase
+                        ci.ddr3_en := '1';
+                        ci.ddr3_cmd := "000";
+                        ci.ddr3_wdf_we := '1';
                         ci.state := state_write_to_ddr3;
                     end if;
                 end if;
             when state_write_to_ddr3 =>
+                ci.ddr3_cmd := "000"; -- UG586 says this is the Write command
+                ci.ddr3_wdf_we := '1';                
                 if(ddr3_wdf_ready = '1' and ddr3_ui_ready = '1' and outstanding_read_count = "000000") then
                     -- okay to issue write;
-                    -- address and data are already connected
-                    ci.ddr3_cmd := "000"; -- UG586 says this is the Write command
-                    ci.ddr3_en := '1';
-                    ci.ddr3_wdf_we := '1';
+                    -- address and data are already connected                    
+                    ci.ddr3_en := '0';
                     -- assuming a strict ordering of memory controller commands,
                     -- we can begin issuing reads again because we guarantee that
                     -- this write will complete before reading the memory,
