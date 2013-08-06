@@ -982,7 +982,7 @@ begin
     PROGRAM_PRINCIPAL_COMPONENT("integrator6.rom", "0110", decoder_pc_prog_addr, decoder_pc_prog_we, decoder_pc_prog_data);
     wait for CLOCK_PERIOD;
     
-    decoder_prog_addr <= (others=>'1');
+    decoder_prog_addr <= (others=>'0');
     decoder_prog_data <= (others=>'1');
     for I in 0 to 63 loop
         decoder_prog_we <= '0';
