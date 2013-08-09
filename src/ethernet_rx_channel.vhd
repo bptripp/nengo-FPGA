@@ -49,7 +49,8 @@ dst_mac <= reg.delay_line(5)(7 downto 0) & reg.delay_line(4)(7 downto 0) & reg.d
 mac_valid <= '1' when (dst_mac = station_mac or dst_mac = broadcast_mac) else '0';
 
 
-fifo_data <= reg.fifo_first & reg.fifo_data;
+fifo_data <= reg.fifo_data;
+fifo_first <= reg.fifo_first;
 fifo_we <= reg.fifo_we;
 
 COMB: process(reg, rst, rx_data, rx_en, dst_mac, mac_valid)
@@ -72,7 +73,7 @@ begin
     else
         case reg.state is
             when state_interframe =>
-                if(data_en = '1') then
+                if(rx_en = '1') then                
                     ci.state := state_preamble;
                 end if;
             when state_preamble =>                

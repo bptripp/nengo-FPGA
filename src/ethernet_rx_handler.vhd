@@ -80,7 +80,7 @@ sim_pause <= reg.sim_pause;
 system_reset <= reg.system_reset;
 
 COMB: process(reg, rst, station_mac, fifo_data, fifo_empty, prog_ok, prog_ack, prog_nyet)
-    variable ci: ci_next;
+    variable ci: ci_type;
     variable frame_data: std_logic_vector(7 downto 0);
     variable frame_first: std_logic;
 begin
@@ -134,7 +134,7 @@ begin
                     if(frame_data /= MATCHED_ETHERTYPE(15 downto 8)) then
                         ci.state := state_interframe;
                     end if;
-                elsif(skip_count = "000000") then
+                elsif(reg.skip_count = "000000") then
                     if(frame_data /= MATCHED_ETHERTYPE(7 downto 0)) then
                         ci.state := state_interframe;
                     else

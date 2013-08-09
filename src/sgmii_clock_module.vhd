@@ -5,8 +5,6 @@ library UNISIM;
 use UNISIM.VComponents.all;
 
 entity sgmii_clock_module is port (
-    SYSCLK_P: in std_logic; -- 200 MHz
-    SYSCLK_N: in std_logic;
     SGMIICLK_P: in std_logic; -- 125 MHz
     SGMIICLK_N: in std_logic;
     txoutclk: in std_logic; -- 62.5 MHz    
@@ -14,7 +12,7 @@ entity sgmii_clock_module is port (
     mmcm_reset: in std_logic;
     mmcm_locked: out std_logic;
     
-    clk_200: out std_logic; -- 200 MHz
+    clk_200: in std_logic; -- 200 MHz
     clk_125: out std_logic; -- 125 MHz
     independent_clock: out std_logic; -- 200 MHz
     mgtrefclk: out std_logic; -- 125 MHz
@@ -24,22 +22,14 @@ entity sgmii_clock_module is port (
 ); end entity sgmii_clock_module;
 
 architecture SevenSeries of sgmii_clock_module is
-    signal clk_200_buf: std_logic;
     signal clk_125_buf: std_logic;
     signal clkout0: std_logic;
     signal clkout1: std_logic;
     signal clkfbout: std_logic;
 begin
 
-SYSCLKBUF: IBUFGDS port map (
-    I => SYSCLK_P,
-    IB => SYSCLK_N,
-    O => clk_200_buf
-);
-clk_200 <= clk_200_buf;
-
 INDEPENDENT_CLOCKBUF: BUFG port map (
-    I => clk_200_buf,
+    I => clk_200,
     O => independent_clock
 );
 

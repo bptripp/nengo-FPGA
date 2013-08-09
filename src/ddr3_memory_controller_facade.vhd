@@ -563,7 +563,7 @@ component delay_line generic (
 
 begin
 
---REAL_DDR3: if (USE_FAKE_RAM = "FALSE") generate
+REAL_DDR3: if (USE_FAKE_RAM = "FALSE") generate
 
 REAL_MEMORY_CONTROLLER: ddr3_memory_controller generic map (
     SIM_BYPASS_INIT_CAL => SIM_BYPASS_INIT_CAL,
@@ -625,7 +625,7 @@ init_calib_complete  => calib_done,
 );
 init_calib_complete <= calib_done;
 
---DDR3_SIMULATION_MODEL: if (SIMULATION = "TRUE") generate
+DDR3_SIMULATION_MODEL: if (SIMULATION = "TRUE") generate
 SODIMM: ddr3_sodimm_sim port map (
     rst_n => ddr3_reset_n,
     ck => ddr3_ck_p(0),
@@ -644,9 +644,29 @@ SODIMM: ddr3_sodimm_sim port map (
     odt => ddr3_odt(0),
     init_calib_complete => calib_done
 );
---end generate DDR3_SIMULATION_MODEL;
+end generate DDR3_SIMULATION_MODEL;
 
---end generate REAL_DDR3;
+CONNECTION_TO_TOPLEVEL: if (SIMULATION = "FALSE") generate
+    -- inouts
+    dq <= ddr3_dq;
+    dqs_p <= ddr3_dqs_p;
+    dqs_n <= ddr3_dqs_n;
+    -- outputs 
+    addr <= ddr3_addr;
+    ba <= ddr3_ba;
+    ras_n <= ddr3_ras_n;
+    cas_n <= ddr3_cas_n;
+    we_n <= ddr3_we_n;
+    reset_n <= ddr3_reset_n;
+    ck_p <= ddr3_ck_p;
+    ck_n <= ddr3_ck_n;
+    cke <= ddr3_cke;
+    cs_n <= ddr3_cs_n;
+    dm <= ddr3_dm;
+    odt <= ddr3_odt;
+end generate CONNECTION_TO_TOPLEVEL;
+
+end generate REAL_DDR3;
 
 FAKE_DDR3: if (USE_FAKE_RAM = "TRUE") generate
     -- derived clock
