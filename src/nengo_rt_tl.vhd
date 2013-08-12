@@ -81,6 +81,15 @@ end entity;
 
 architecture rtl of nengo_rt_tl is
 
+component synchronizer   generic(
+    G_INIT_VALUE    : std_logic := '0'; -- initial value of all flip-flops in the module
+    G_NUM_GUARD_FFS : positive  := 1);  -- number of guard flip-flops after the synchronizing flip-flop
+  port(
+    i_reset : in  std_logic;            -- asynchronous, high-active
+    i_clk   : in  std_logic;            -- destination clock
+    i_data  : in  std_logic;
+    o_data  : out std_logic); end component synchronizer;
+
 component reset_controller port (
     clk: in std_logic;
     rst_i: in std_logic;
@@ -88,6 +97,7 @@ component reset_controller port (
     rst_done: out std_logic
 ); end component;
 signal system_reset: std_logic;
+signal system_reset_200: std_logic;
 signal system_reset_done: std_logic;
 signal enable_programming: std_logic;
 signal run_started: std_logic := '0';
@@ -572,6 +582,7 @@ component decoder_fifo PORT (
     wr_data_count : OUT STD_LOGIC_VECTOR(5 DOWNTO 0)
   ); end component;
 signal decoder_coefficient_fifo_rst: std_logic;
+signal decoder_coefficient_fifo_rst_125: std_logic;
 signal decoder_coefficient_fifo_din: std_logic_vector(511 downto 0);
 signal decoder_coefficient_fifo_wr_en: std_logic;
 signal decoder_coefficient_fifo_full: std_logic;
@@ -601,6 +612,7 @@ signal shift_clear: std_logic;
 signal shift_en: std_logic;
 signal shift_ack: std_logic_vector(0 downto 0);
 signal shctl_invalidate: std_logic;
+signal shctl_invalidate_125: std_logic;
 
 begin
 
@@ -609,6 +621,16 @@ SYS_RST: reset_controller port map (
     rst_i => rst,
     rst_o => system_reset,
     rst_done => system_reset_done
+);
+
+SYNC_SYSTEM_RESET_200: synchronizer generic map (
+    G_INIT_VALUE => '0',
+    G_NUM_GUARD_FFS => 1
+) port map (
+    i_reset => '0',
+    i_clk => clk_200,
+    i_data => system_reset,
+    o_data => system_reset_200
 );
 
 enable_programming <= '1' when (system_reset_done = '1' and run_started = '0') else '0';
@@ -882,7 +904,7 @@ DDR3: ddr3_memory_controller_facade generic map (
     ui_clk => clk_200,
     ui_clk_sync_rst => open,
     init_calib_complete => ddr3_calibration_complete,
-    sys_rst => rst -- FIXME wrong clock domain
+    sys_rst => system_reset_200
 );
 
 DECODER_MARSHAL: decoder_marshal_unit port map (
@@ -913,7 +935,7 @@ MARSHALLED_FIFO: decoder_marshalled_fifo port map (
 
 DECODER_UNMARSHAL: decoder_unmarshal_unit port map (
     clk => clk_200,
-    rst => rst, -- FIXME wrong clock domain
+    rst => system_reset_200,
     fifo_dout => decoder_marshal_fifo_dout,
     fifo_re => decoder_marshal_fifo_re,
     fifo_empty => decoder_marshal_fifo_empty,
@@ -929,7 +951,7 @@ PREFETCH_CTL: prefetch_controller generic map (
     T => 12
 ) port map (
     clk => clk_200,
-    rst => rst, -- FIXME wrong clock domain
+    rst => system_reset_200, 
     -- prog
     prog_addr => decoder_unmarshal_addr,
     prog_we => decoder_unmarshal_we,
@@ -957,8 +979,17 @@ PREFETCH_CTL: prefetch_controller generic map (
     ddr3_read_valid => ddr3_read_valid 
 );
 
+SYNC_DECODER_COEFFICIENT_FIFO_RST_125: synchronizer generic map ( -- FIXME is this necessary?
+    G_INIT_VALUE => '0',
+    G_NUM_GUARD_FFS => 1
+) port map (
+    i_reset => system_reset,
+    i_clk => clk_125,
+    i_data => decoder_coefficient_fifo_rst,
+    o_data => decoder_coefficient_fifo_rst_125
+);
 DECODER_COEFFICIENT_FIFO: decoder_fifo port map (
-    rst => decoder_coefficient_fifo_rst,    
+    rst => decoder_coefficient_fifo_rst_125,    
     wr_clk => clk_200,
     din => decoder_coefficient_fifo_din,
     wr_en => decoder_coefficient_fifo_wr_en,
@@ -971,13 +1002,23 @@ DECODER_COEFFICIENT_FIFO: decoder_fifo port map (
     empty => decoder_coefficient_fifo_empty    
 );
 
+
+SYNC_SHCTL_INVALIDATE_125: synchronizer generic map (
+    G_INIT_VALUE => '0',
+    G_NUM_GUARD_FFS => 1
+) port map (
+    i_reset => system_reset,
+    i_clk => clk_125,
+    i_data => shctl_invalidate,
+    o_data => shctl_invalidate_125
+);
 SHIFT_CTL: shift_controller generic map (
     N => 1,
     C => to_unsigned(12, 8) -- one decoder, therefore 12 shreg bits
 ) port map (
     clk => clk_125,
     rst => system_reset,
-    invalidate => shctl_invalidate,
+    invalidate => shctl_invalidate_125,
     fifo_data => decoder_coefficient_fifo_dout,
     fifo_empty => decoder_coefficient_fifo_empty,
     fifo_rd_en => shift_fifo_rd_en,

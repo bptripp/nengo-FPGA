@@ -165,4 +165,17 @@ set_property IOSTANDARD SSTL15_T_DCI [get_ports {ddr3_dq[3]}]
 set_property IOSTANDARD SSTL15_T_DCI [get_ports {ddr3_dq[2]}]
 set_property IOSTANDARD SSTL15_T_DCI [get_ports {ddr3_dq[1]}]
 set_property IOSTANDARD SSTL15_T_DCI [get_ports {ddr3_dq[0]}]
+set_property LOC IDELAY_X1Y303 [get_cells {NENGO/DDR3/REAL_DDR3.REAL_MEMORY_CONTROLLER/u_memc_ui_top_std/mem_intfc0/ddr_phy_top0/u_ddr_mc_phy_wrapper/u_ddr_mc_phy/ddr_phy_4lanes_0.u_ddr_phy_4lanes/ddr_byte_lane_A.ddr_byte_lane_A/ddr_byte_group_io/input_[2].iserdes_dq_.idelaye2}]
+set_property LOC ILOGIC_X1Y303 [get_cells {NENGO/DDR3/REAL_DDR3.REAL_MEMORY_CONTROLLER/u_memc_ui_top_std/mem_intfc0/ddr_phy_top0/u_ddr_mc_phy_wrapper/u_ddr_mc_phy/ddr_phy_4lanes_0.u_ddr_phy_4lanes/ddr_byte_lane_A.ddr_byte_lane_A/ddr_byte_group_io/input_[2].iserdes_dq_.iserdesdq}]
+set_property LOC OLOGIC_X1Y303 [get_cells {NENGO/DDR3/REAL_DDR3.REAL_MEMORY_CONTROLLER/u_memc_ui_top_std/mem_intfc0/ddr_phy_top0/u_ddr_mc_phy_wrapper/u_ddr_mc_phy/ddr_phy_4lanes_0.u_ddr_phy_4lanes/ddr_byte_lane_A.ddr_byte_lane_A/ddr_byte_group_io/output_[2].oserdes_dq_.ddr.oserdes_dq_i}]
 set_property PACKAGE_PIN N14 [get_ports {ddr3_dq[0]}]
+
+create_clock -period 8.000 -name SGMII_P -waveform {0.000 4.000} [get_ports SGMIICLK_P]
+
+create_pblock pblock_1
+add_cells_to_pblock [get_pblocks pblock_1] [get_cells -quiet [list NENGO/ENCODER_PIPE NENGO/DECODER_COEFFICIENT_FIFO NENGO/MARSHALLED_FIFO NENGO/ENCODER_PIPE_CTRL NENGO/DV_BANK0 NENGO/SYNC_DECODER_COEFFICIENT_FIFO_RST_125 NENGO/DECODER_TOP_HALF NENGO/DELAY_RD0 NENGO/SYNC_SHCTL_INVALIDATE_125 NENGO/DECODER_BOTTOM_HALF NENGO/DECODER_MARSHAL NENGO/ENCODER NENGO/PREFETCH_CTL NENGO/DECODER_UNMARSHAL NENGO/H1 NENGO/SYNC_SYSTEM_RESET_200 NENGO/SHIFT_CTL]]
+resize_pblock [get_pblocks pblock_1] -add {SLICE_X110Y150:SLICE_X173Y199}
+resize_pblock [get_pblocks pblock_1] -add {DSP48_X9Y60:DSP48_X16Y79}
+resize_pblock [get_pblocks pblock_1] -add {RAMB18_X7Y60:RAMB18_X10Y79}
+resize_pblock [get_pblocks pblock_1] -add {RAMB36_X7Y30:RAMB36_X10Y39}
+
