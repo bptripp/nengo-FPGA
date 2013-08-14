@@ -43,6 +43,10 @@ signal ci_next: ci_type;
 
 begin
 
+running <= reg.running;
+timestep <= reg.timestep;
+timestep_overflow <= reg.timestep_overflow;
+
 COMB: process(reg, rst, start, pause, done)
     variable ci: ci_type;
     variable next_timer: unsigned(17 downto 0);
@@ -79,6 +83,7 @@ begin
         else
             if(start = '1') then
                 ci.running := '1';
+                ci.timestep := '1';
             end if;
         end if;
     end if;
