@@ -21,6 +21,8 @@ entity vc707_nengo_rt is port (
 
 architecture TOPLEVEL of vc707_nengo_rt is
 
+attribute mark_debug : string;
+
 constant station_mac: std_logic_vector(47 downto 0) := X"000A35028FC0";
 
 component sgmii_clock_module port (
@@ -157,8 +159,8 @@ component ethernet_rx_fifo PORT (
     full : OUT STD_LOGIC;
     empty : OUT STD_LOGIC
   ); end component ethernet_rx_fifo;
-  signal rx_fifo_re: std_logic;
-  signal rx_fifo_dout: std_logic_vector(8 downto 0);
+  signal rx_fifo_re: std_logic; attribute mark_debug of rx_fifo_re: signal is "true";
+  signal rx_fifo_dout: std_logic_vector(8 downto 0); attribute mark_debug of rx_fifo_dout: signal is "true";
   signal rx_fifo_full: std_logic;
   signal rx_fifo_empty: std_logic;
 
@@ -185,11 +187,11 @@ component ethernet_rx_handler port (
     sim_start: out std_logic;
     sim_pause: out std_logic
 ); end component ethernet_rx_handler;
-signal prog_addr: std_logic_vector(23 downto 0);
-signal prog_we: std_logic;
-signal prog_data: std_logic_vector(39 downto 0);
-signal prog_ok: std_logic;
-signal prog_ack: std_logic;
+signal prog_addr: std_logic_vector(23 downto 0); attribute mark_debug of prog_addr: signal is "true";
+signal prog_we: std_logic; attribute mark_debug of prog_we: signal is "true";
+signal prog_data: std_logic_vector(39 downto 0); attribute mark_debug of prog_data: signal is "true";
+signal prog_ok: std_logic; attribute mark_debug of prog_ok: signal is "true";
+signal prog_ack: std_logic; attribute mark_debug of prog_ack: signal is "true";
 signal prog_nyet: std_logic;
 signal system_reset: std_logic;
 signal sim_start: std_logic;
@@ -214,8 +216,8 @@ component nengo_rt_tl generic (
     running: out std_logic;
     timestep_overflow: out std_logic -- Strobed HIGH when a timeout has occurred.
     ); end component nengo_rt_tl;
-    signal sim_running: std_logic;
-    signal timestep_overflow: std_logic;
+    signal sim_running: std_logic; attribute mark_debug of sim_running: signal is "true";
+    signal timestep_overflow: std_logic; attribute mark_debug of timestep_overflow: signal is "true";
 
 begin
 
@@ -235,7 +237,7 @@ CLOCK_MODULE: sgmii_clock_module port map (
     userclk2 => userclk2
 );
 mmcm_reset <= RST or not resetdone;
-PHY_RESET <= RST;
+PHY_RESET <= not RST; -- active_low
 
 
 SGMII: sgmii_vc707 generic map ( EXAMPLE_SIMULATION => 0) port map (

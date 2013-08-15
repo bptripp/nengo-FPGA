@@ -60,6 +60,8 @@ end entity;
 
 architecture rtl of nengo_rt_tl is
 
+attribute mark_debug: string;
+
 component synchronizer   generic(
     G_INIT_VALUE    : std_logic := '0'; -- initial value of all flip-flops in the module
     G_NUM_GUARD_FFS : positive  := 1);  -- number of guard flip-flops after the synchronizing flip-flop
@@ -129,7 +131,7 @@ port (
     timestep_overflow: out std_logic
 ); end component;
 signal all_decoders_done: std_logic;
-signal timestep: std_logic;
+signal timestep: std_logic; attribute mark_debug of timestep: signal is "true";
 
 component dv_double_buffer port (
         clk: in std_logic;
@@ -162,9 +164,9 @@ signal dv_rd0_addr: std_logic_vector(10 downto 0);
 signal dv_rd0_data: std_logic_vector(11 downto 0);
 signal dv_rd1_addr: std_logic_vector(10 downto 0);
 signal dv_rd1_data: std_logic_vector(11 downto 0);
-signal dv_wr0_addr: std_logic_vector(10 downto 0);
-signal dv_wr0_we: std_logic;
-signal dv_wr0_data: std_logic_vector(11 downto 0);
+signal dv_wr0_addr: std_logic_vector(10 downto 0); attribute mark_debug of dv_wr0_addr: signal is "true";
+signal dv_wr0_we: std_logic; attribute mark_debug of dv_wr0_we: signal is "true";
+signal dv_wr0_data: std_logic_vector(11 downto 0); attribute mark_debug of dv_wr0_data: signal is "true";
 -- wr1
 signal dv_prog_addr: std_logic_vector(10 downto 0);
 signal dv_prog_we: std_logic;
