@@ -117,6 +117,7 @@ signal reg: ci_type := reg_reset;
 signal ci_next: ci_type;
 
 component timestep_sequencer generic (
+    SIMULATION: string := "FALSE";
     CLOCKS_PER_TIMESTEP: positive := 125000 -- 1 millisecond * 125 MHz
 ); 
 port (
@@ -160,8 +161,8 @@ component dv_double_buffer port (
 ); end component;
 
 signal swap_banks: std_logic;
-signal dv_rd0_addr: std_logic_vector(10 downto 0);
-signal dv_rd0_data: std_logic_vector(11 downto 0);
+signal dv_rd0_addr: std_logic_vector(10 downto 0); attribute mark_debug of dv_rd0_addr: signal is "true";
+signal dv_rd0_data: std_logic_vector(11 downto 0); attribute mark_debug of dv_rd0_data: signal is "true";
 signal dv_rd1_addr: std_logic_vector(10 downto 0);
 signal dv_rd1_data: std_logic_vector(11 downto 0);
 signal dv_wr0_addr: std_logic_vector(10 downto 0); attribute mark_debug of dv_wr0_addr: signal is "true";
@@ -214,7 +215,7 @@ signal encoder_next_population: std_logic;
 signal encoder_dv_addr: std_logic_vector(18 downto 0);
 signal encoder_dv_port: std_logic;
 signal encoder_dv_data: std_logic_vector(11 downto 0);
-signal encoder_sum: sfixed(1 downto -10);
+signal encoder_sum: sfixed(1 downto -10); attribute mark_debug of encoder_sum: signal is "true";
 signal encoder_done: std_logic;
 signal encoder_we: std_logic;
 signal encoder_prog_we: std_logic;
@@ -253,9 +254,9 @@ component first_order_filter_unit port (
     prog_we: in std_logic;
     prog_data: in std_logic_vector(11 downto 0)
 ); end component;
-signal h1_u: sfixed(1 downto -10);
+signal h1_u: sfixed(1 downto -10); attribute mark_debug of h1_u: signal is "true";
 signal h1_valid: std_logic;
-signal h1_y: sfixed(1 downto -10);
+signal h1_y: sfixed(1 downto -10); attribute mark_debug of h1_y: signal is "true";
 signal h1_ready: std_logic;
 signal h1_ready_stb: std_logic;
 signal h1_ack: std_logic;
@@ -528,6 +529,8 @@ end process SEQ;
 
 
 SEQUENCER: timestep_sequencer generic map (
+    --SIMULATION => SIMULATION,
+    SIMULATION => "TRUE", -- FIXME CHEATING to get faster runs
     CLOCKS_PER_TIMESTEP => 125000
 ) port map (
     clk => clk_125,
@@ -597,6 +600,7 @@ ENCODER: encoder_unit port map (
 );
 dv_rd0_addr <= encoder_dv_addr(10 downto 0);
 encoder_dv_data <= dv_rd0_data_delayed;
+dv_rd1_addr <= encoder_dv_addr(10 downto 0); -- FIXME CHEATING
 
 ENCODER_PIPE_CTRL: encoder_pipeline_controller generic map (
         N => 1

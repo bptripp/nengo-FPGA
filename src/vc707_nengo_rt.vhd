@@ -145,8 +145,8 @@ component ethernet_rx_channel port (
     fifo_we: out std_logic
 ); end component ethernet_rx_channel;
 
-signal rx_fifo_din: std_logic_vector(8 downto 0);
-signal rx_fifo_we: std_logic;
+signal rx_fifo_din: std_logic_vector(8 downto 0); 
+signal rx_fifo_we: std_logic; 
 
 component ethernet_rx_fifo PORT (
     rst : IN STD_LOGIC;
@@ -159,8 +159,8 @@ component ethernet_rx_fifo PORT (
     full : OUT STD_LOGIC;
     empty : OUT STD_LOGIC
   ); end component ethernet_rx_fifo;
-  signal rx_fifo_re: std_logic; attribute mark_debug of rx_fifo_re: signal is "true";
-  signal rx_fifo_dout: std_logic_vector(8 downto 0); attribute mark_debug of rx_fifo_dout: signal is "true";
+  signal rx_fifo_re: std_logic; 
+  signal rx_fifo_dout: std_logic_vector(8 downto 0); 
   signal rx_fifo_full: std_logic;
   signal rx_fifo_empty: std_logic;
 
@@ -187,11 +187,11 @@ component ethernet_rx_handler port (
     sim_start: out std_logic;
     sim_pause: out std_logic
 ); end component ethernet_rx_handler;
-signal prog_addr: std_logic_vector(23 downto 0); attribute mark_debug of prog_addr: signal is "true";
-signal prog_we: std_logic; attribute mark_debug of prog_we: signal is "true";
-signal prog_data: std_logic_vector(39 downto 0); attribute mark_debug of prog_data: signal is "true";
-signal prog_ok: std_logic; attribute mark_debug of prog_ok: signal is "true";
-signal prog_ack: std_logic; attribute mark_debug of prog_ack: signal is "true";
+signal prog_addr: std_logic_vector(23 downto 0); 
+signal prog_we: std_logic; 
+signal prog_data: std_logic_vector(39 downto 0); 
+signal prog_ok: std_logic; 
+signal prog_ack: std_logic; 
 signal prog_nyet: std_logic;
 signal system_reset: std_logic;
 signal sim_start: std_logic;
@@ -216,8 +216,8 @@ component nengo_rt_tl generic (
     running: out std_logic;
     timestep_overflow: out std_logic -- Strobed HIGH when a timeout has occurred.
     ); end component nengo_rt_tl;
-    signal sim_running: std_logic; attribute mark_debug of sim_running: signal is "true";
-    signal timestep_overflow: std_logic; attribute mark_debug of timestep_overflow: signal is "true";
+    signal sim_running: std_logic; 
+    signal timestep_overflow: std_logic; 
 
 begin
 
@@ -347,6 +347,12 @@ NENGO: nengo_rt_tl generic map (SIMULATION => "FALSE") port map (
 );
 
 GPIO_LED(0) <= prog_ok;
+GPIO_LED(1) <= '0';
+GPIO_LED(2) <= '0';
+GPIO_LED(3) <= '0';
+GPIO_LED(4) <= '0';
+GPIO_LED(5) <= '0';
+GPIO_LED(6) <= '0';
 GPIO_LED(7) <= sim_running;
 
 end architecture TOPLEVEL;

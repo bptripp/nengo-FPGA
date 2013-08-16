@@ -23,7 +23,7 @@ architecture rtl of dv_block is
     shared variable RAM: ram_type := (others=>X"000");
 begin
 
-    PORT0: process(clk, rst)
+    PORT0: process(clk, rst, port0_addr, port0_we, port0_di)
     begin
         if(rising_edge(clk)) then
             port0_do <= RAM(to_integer(unsigned(port0_addr)));
@@ -35,7 +35,7 @@ begin
         end if;
     end process PORT0;
     
-    PORT1: process(clk)
+    PORT1: process(clk, port1_addr, port1_we, port1_di)
     begin
         if(rising_edge(clk)) then
             port1_do <= RAM(to_integer(unsigned(port1_addr)));

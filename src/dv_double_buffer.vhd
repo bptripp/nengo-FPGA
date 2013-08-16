@@ -32,6 +32,7 @@ entity dv_double_buffer is
 end entity;
 
 architecture rtl of dv_double_buffer is
+
     signal active_set: std_logic := '0'; -- mux select bit
     
     signal bank0_port0_addr: std_logic_vector(10 downto 0);
@@ -54,46 +55,45 @@ architecture rtl of dv_double_buffer is
     signal bank1_port1_di: std_logic_vector(11 downto 0);
     signal bank1_port1_do: std_logic_vector(11 downto 0);
     
-    component dv_block port (
-    clk: in std_logic;
-    rst: in std_logic;
-    port0_addr: in std_logic_vector(10 downto 0);
-    port0_we: in std_logic;
-    port0_di: in std_logic_vector(11 downto 0);
-    port0_do: out std_logic_vector(11 downto 0);
-
-    port1_addr: in std_logic_vector(10 downto 0);
-    port1_we: in std_logic;
-    port1_di: in std_logic_vector(11 downto 0);
-    port1_do: out std_logic_vector(11 downto 0)
+    component dv_block PORT (
+      clka : IN STD_LOGIC;
+      wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+      addra : IN STD_LOGIC_VECTOR(10 DOWNTO 0);
+      dina : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+      douta : OUT STD_LOGIC_VECTOR(11 DOWNTO 0);
+      clkb : IN STD_LOGIC;
+      web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+      addrb : IN STD_LOGIC_VECTOR(10 DOWNTO 0);
+      dinb : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+      doutb : OUT STD_LOGIC_VECTOR(11 DOWNTO 0)
     ); end component dv_block;
-           
+        
 begin
 
 BANK0: dv_block port map (
-    clk => clk,
-    rst => rst,
-    port0_addr => bank0_port0_addr,
-    port0_we => bank0_port0_we,
-    port0_di => bank0_port0_di,
-    port0_do => bank0_port0_do,
-    port1_addr => bank0_port1_addr,
-    port1_we => bank0_port1_we,
-    port1_di => bank0_port1_di,
-    port1_do => bank0_port1_do    
+    clka => clk,
+    clkb => clk,    
+    addra => bank0_port0_addr,
+    wea(0) => bank0_port0_we,
+    dina => bank0_port0_di,
+    douta => bank0_port0_do,
+    addrb => bank0_port1_addr,
+    web(0) => bank0_port1_we,
+    dinb => bank0_port1_di,
+    doutb => bank0_port1_do    
 );
 
 BANK1: dv_block port map (
-    clk => clk,
-    rst => rst,
-    port0_addr => bank1_port0_addr,
-    port0_we => bank1_port0_we,
-    port0_di => bank1_port0_di,
-    port0_do => bank1_port0_do,
-    port1_addr => bank1_port1_addr,
-    port1_we => bank1_port1_we,
-    port1_di => bank1_port1_di,
-    port1_do => bank1_port1_do    
+    clka => clk,
+    clkb => clk,    
+    addra => bank1_port0_addr,
+    wea(0) => bank1_port0_we,
+    dina => bank1_port0_di,
+    douta => bank1_port0_do,
+    addrb => bank1_port1_addr,
+    web(0) => bank1_port1_we,
+    dinb => bank1_port1_di,
+    doutb => bank1_port1_do    
 );
 
 SWAP: process(clk, swap_banks)

@@ -77,6 +77,14 @@ signal pause: std_logic;
 signal running: std_logic;
 signal timestep_overflow: std_logic;
 
+  function to_string(sv: Std_Logic_Vector) return string is
+    variable bv: bit_vector(sv'range) := to_bitvector(sv);
+    variable lp: line;
+  begin
+    write(lp, bv);
+    return lp.all;
+  end;
+  
 procedure PROGRAM_WITH_HANDSHAKE
 (
     signal clk: in std_logic;
@@ -102,6 +110,7 @@ begin
     end if;
     assert(prog_nyet = '0') report "Attempt to program got response NYET" severity failure;
     assert(prog_error = '0') report "Attempt to program got response ERROR" severity failure;
+    report "PROGRAM address = " & to_string(next_prog_addr) & " data = " & to_string(next_prog_data);
     wait until prog_ack = '0';
 end procedure PROGRAM_WITH_HANDSHAKE;
 
@@ -460,7 +469,8 @@ begin
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
     PROGRAM_PRINCIPAL_COMPONENT(0, 6, "integrator6.rom",
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    -- program DV#0 decoders 0 through 7       
+    -- program DV#0 decoders 0 through 7
+    -- FIXME technically we have to program 1024 decoders but they're all the same so this isn't wrong for now       
     PROGRAM_DECODER(0, 0, 0, to_slv(to_sfixed(0.16025, 1,-10)),
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
     PROGRAM_DECODER(0, 0, 1, to_slv(to_sfixed(-1.87415, 1,-10)),

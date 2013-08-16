@@ -3,6 +3,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity timestep_sequencer is generic (
+    SIMULATION: string := "FALSE";
     CLOCKS_PER_TIMESTEP: positive := 125000 -- 1 millisecond * 125 MHz
 ); 
 port (
@@ -66,8 +67,8 @@ begin
         if(pause = '1') then
             ci.paused := '1';
         end if;
-        if(reg.running = '1') then
-            if(reg.timer >= MAX_CLOCKS) then
+        if(reg.running = '1' and reg.timestep = '0') then
+            if(SIMULATION = "TRUE" or reg.timer >= MAX_CLOCKS) then
                 if(done = '1') then
                     ci.timestep_overflow := '0';
                     ci.timer := (others=>'0');
@@ -76,7 +77,7 @@ begin
                     else                        
                         ci.timestep := '1';
                     end if;
-                 else
+                 elsif(SIMULATION = "FALSE") then
                     ci.timestep_overflow := '1';
                  end if;                    
             end if;              
