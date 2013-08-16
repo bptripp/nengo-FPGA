@@ -33,6 +33,7 @@ entity decoder_unit_top_half_1d is port (
 ); end entity decoder_unit_top_half_1d;
 
 architecture rtl of decoder_unit_top_half_1d is
+
     type state_type is (state_wait_for_fifo, state_wait_for_pc, state_wait_for_next_stage_ack);
     type ci_type is record
         state: state_type;

@@ -12,24 +12,6 @@ entity vc707_nengo_rt is port (
     SGMII_RXP : in std_logic; 
     SGMII_RXN : in std_logic;
     PHY_RESET: out std_logic;
-
--- decapitalized names for compatibility with MIG XDC    
-    ddr3_dq: inout std_logic_vector(63 downto 0);
-    ddr3_dqs_p: inout std_logic_vector(7 downto 0);
-    ddr3_dqs_n: inout std_logic_vector(7 downto 0);
-
-    ddr3_addr: out   std_logic_vector(13 downto 0);
-    ddr3_ba: out   std_logic_vector(2 downto 0);
-    ddr3_ras_n: out   std_logic;
-    ddr3_cas_n : out   std_logic;
-    ddr3_we_n : out   std_logic;
-    ddr3_reset_n : out   std_logic;
-    ddr3_ck_p : out   std_logic;
-    ddr3_ck_n : out   std_logic;
-    ddr3_cke : out   std_logic_vector(0 downto 0);
-    ddr3_cs_n : out   std_logic_vector(0 downto 0);
-    ddr3_dm : out   std_logic_vector(7 downto 0);
-    ddr3_odt : out   std_logic_vector(0 downto 0);
     
     RST: in std_logic;
     
@@ -39,23 +21,26 @@ entity vc707_nengo_rt is port (
 
 architecture TOPLEVEL of vc707_nengo_rt is
 
+attribute mark_debug : string;
+
 constant station_mac: std_logic_vector(47 downto 0) := X"000A35028FC0";
 
 component sgmii_clock_module port (
-    SGMIICLK_P: in std_logic; -- 125 MHz
-    SGMIICLK_N: in std_logic;
-    txoutclk: in std_logic; -- 62.5 MHz    
-    
-    mmcm_reset: in std_logic;
-    mmcm_locked: out std_logic;
-    
-    clk_200: in std_logic; -- 200 MHz
-    clk_125: out std_logic; -- 125 MHz
-    independent_clock: out std_logic; -- 200 MHz
-    mgtrefclk: out std_logic; -- 125 MHz
-    userclk: out std_logic; -- 62.5 MHz
-    userclk2: out std_logic -- 125 MHz
-    
+SYSCLK_P: in std_logic; -- 200 MHz
+SYSCLK_N: in std_logic;
+SGMIICLK_P: in std_logic; -- 125 MHz
+SGMIICLK_N: in std_logic;
+txoutclk: in std_logic; -- 62.5 MHz    
+
+mmcm_reset: in std_logic;
+mmcm_locked: out std_logic;
+
+clk_200: out std_logic; -- 200 MHz
+clk_125: out std_logic; -- 125 MHz
+independent_clock: out std_logic; -- 200 MHz
+mgtrefclk: out std_logic; -- 125 MHz
+userclk: out std_logic; -- 62.5 MHz
+userclk2: out std_logic -- 125 MHz
 ); end component sgmii_clock_module;
 signal txoutclk: std_logic;
 signal mmcm_reset: std_logic;
@@ -160,8 +145,8 @@ component ethernet_rx_channel port (
     fifo_we: out std_logic
 ); end component ethernet_rx_channel;
 
-signal rx_fifo_din: std_logic_vector(8 downto 0);
-signal rx_fifo_we: std_logic;
+signal rx_fifo_din: std_logic_vector(8 downto 0); 
+signal rx_fifo_we: std_logic; 
 
 component ethernet_rx_fifo PORT (
     rst : IN STD_LOGIC;
@@ -174,8 +159,8 @@ component ethernet_rx_fifo PORT (
     full : OUT STD_LOGIC;
     empty : OUT STD_LOGIC
   ); end component ethernet_rx_fifo;
-  signal rx_fifo_re: std_logic;
-  signal rx_fifo_dout: std_logic_vector(8 downto 0);
+  signal rx_fifo_re: std_logic; 
+  signal rx_fifo_dout: std_logic_vector(8 downto 0); 
   signal rx_fifo_full: std_logic;
   signal rx_fifo_empty: std_logic;
 
@@ -202,11 +187,11 @@ component ethernet_rx_handler port (
     sim_start: out std_logic;
     sim_pause: out std_logic
 ); end component ethernet_rx_handler;
-signal prog_addr: std_logic_vector(23 downto 0);
-signal prog_we: std_logic;
-signal prog_data: std_logic_vector(39 downto 0);
-signal prog_ok: std_logic;
-signal prog_ack: std_logic;
+signal prog_addr: std_logic_vector(23 downto 0); 
+signal prog_we: std_logic; 
+signal prog_data: std_logic_vector(39 downto 0); 
+signal prog_ok: std_logic; 
+signal prog_ack: std_logic; 
 signal prog_nyet: std_logic;
 signal system_reset: std_logic;
 signal sim_start: std_logic;
@@ -216,27 +201,6 @@ signal sim_pause: std_logic;
 component nengo_rt_tl generic (
     SIMULATION: string := "FALSE"
 ); port (
-    CLK200_P: in std_logic;
-    CLK200_N: in std_logic;
-    
-    DDR3_DQ: inout std_logic_vector(63 downto 0);
-    DDR3_DQS_P: inout std_logic_vector(7 downto 0);
-    DDR3_DQS_N: inout std_logic_vector(7 downto 0);
-
-    DDR3_ADDR : out   std_logic_vector(13 downto 0);
-    DDR3_BA: out   std_logic_vector(2 downto 0);
-    DDR3_RAS_N: out   std_logic;
-    DDR3_CAS_N : out   std_logic;
-    DDR3_WE_N : out   std_logic;
-    DDR3_RESET_N : out   std_logic;
-    DDR3_CK_P : out   std_logic_vector(0 downto 0);
-    DDR3_CK_N : out   std_logic_vector(0 downto 0);
-    DDR3_CKE : out   std_logic_vector(0 downto 0);
-    DDR3_CS_N : out   std_logic_vector(0 downto 0);
-    DDR3_DM : out   std_logic_vector(7 downto 0);
-    DDR3_ODT : out   std_logic_vector(0 downto 0);
-    clk_200_out: out std_logic;
-    
     clk_125: in std_logic;
     rst: in std_logic;    
     prog_addr: in std_logic_vector(23 downto 0); 
@@ -252,12 +216,14 @@ component nengo_rt_tl generic (
     running: out std_logic;
     timestep_overflow: out std_logic -- Strobed HIGH when a timeout has occurred.
     ); end component nengo_rt_tl;
-    signal sim_running: std_logic;
-    signal timestep_overflow: std_logic;
+    signal sim_running: std_logic; 
+    signal timestep_overflow: std_logic; 
 
 begin
 
 CLOCK_MODULE: sgmii_clock_module port map (
+    SYSCLK_P => SYSCLK_P,
+    SYSCLK_N => SYSCLK_N,
     SGMIICLK_P => SGMIICLK_P,
     SGMIICLK_N => SGMIICLK_N,
     txoutclk => txoutclk,
@@ -271,7 +237,7 @@ CLOCK_MODULE: sgmii_clock_module port map (
     userclk2 => userclk2
 );
 mmcm_reset <= RST or not resetdone;
-PHY_RESET <= RST;
+PHY_RESET <= not RST; -- active_low
 
 
 SGMII: sgmii_vc707 generic map ( EXAMPLE_SIMULATION => 0) port map (
@@ -365,25 +331,6 @@ RX_HANDLER: ethernet_rx_handler port map (
 );
 
 NENGO: nengo_rt_tl generic map (SIMULATION => "FALSE") port map (
-    CLK200_P => SYSCLK_P,
-    CLK200_N => SYSCLK_N,
-    DDR3_DQ => DDR3_DQ,
-    DDR3_DQS_P => DDR3_DQS_P,
-    DDR3_DQS_N => DDR3_DQS_N,
-    DDR3_ADDR => DDR3_ADDR,
-    DDR3_BA => DDR3_BA,
-    DDR3_RAS_N => DDR3_RAS_N,
-    DDR3_CAS_N => DDR3_CAS_N,
-    DDR3_WE_N => DDR3_WE_N,
-    DDR3_RESET_N => DDR3_RESET_N,
-    DDR3_CK_P(0) => DDR3_CK_P,
-    DDR3_CK_N(0) => DDR3_CK_N,
-    DDR3_CKE => DDR3_CKE,
-    DDR3_CS_N => DDR3_CS_N,
-    DDR3_DM => DDR3_DM,
-    DDR3_ODT => DDR3_ODT,
-    clk_200_out => clk_200,
-    
     clk_125 => clk_125,
     rst => system_reset,
     prog_addr => prog_addr,
@@ -400,6 +347,12 @@ NENGO: nengo_rt_tl generic map (SIMULATION => "FALSE") port map (
 );
 
 GPIO_LED(0) <= prog_ok;
+GPIO_LED(1) <= '0';
+GPIO_LED(2) <= '0';
+GPIO_LED(3) <= '0';
+GPIO_LED(4) <= '0';
+GPIO_LED(5) <= '0';
+GPIO_LED(6) <= '0';
 GPIO_LED(7) <= sim_running;
 
 end architecture TOPLEVEL;

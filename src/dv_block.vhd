@@ -5,6 +5,7 @@ use ieee.numeric_std.all;
 entity dv_block is
     port (
     clk: in std_logic;
+    rst: in std_logic;
     port0_addr: in std_logic_vector(10 downto 0);
     port0_we: in std_logic;
     port0_di: in std_logic_vector(11 downto 0);
@@ -22,17 +23,19 @@ architecture rtl of dv_block is
     shared variable RAM: ram_type := (others=>X"000");
 begin
 
-    PORT0: process(clk)
+    PORT0: process(clk, rst, port0_addr, port0_we, port0_di)
     begin
         if(rising_edge(clk)) then
             port0_do <= RAM(to_integer(unsigned(port0_addr)));
-            if(port0_we = '1') then
+            if(rst = '1') then
+                RAM := (others=>X"000");                
+            elsif(port0_we = '1') then
                 RAM(to_integer(unsigned(port0_addr))) := port0_di;
             end if;
         end if;
     end process PORT0;
     
-    PORT1: process(clk)
+    PORT1: process(clk, port1_addr, port1_we, port1_di)
     begin
         if(rising_edge(clk)) then
             port1_do <= RAM(to_integer(unsigned(port1_addr)));

@@ -1,9 +1,0 @@
-*.vho
-*.xdc
-*.xml
-*.tcl
-*.vhd
-*.veo
-tcl.log
-xil_txt.*
-ddr3_memory_controller/*

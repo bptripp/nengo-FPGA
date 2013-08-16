@@ -24,6 +24,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 library IEEE_proposed;
 use IEEE_proposed.fixed_pkg.ALL;
+use IEEE_proposed.fixed_float_types.ALL;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -85,8 +86,8 @@ begin
             stall <= '0';
             we <= '0';
         elsif(valid = '1' and stall = '0') then
-            x_state <= resize(A*x + B*u, x_state);
-            y_out <= resize(C*x + D*u, y_out);
+            x_state <= resize(A*x + B*u, x_state, fixed_saturate, fixed_truncate);
+            y_out <= resize(C*x + D*u, y_out, fixed_saturate, fixed_truncate);
             stall <= '1';
             we <= '1';
         else

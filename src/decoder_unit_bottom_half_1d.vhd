@@ -24,12 +24,10 @@ entity decoder_unit_bottom_half_1d is generic (
     pc_ready: in std_logic;
     pc_ack: out std_logic;
     
-    -- shift registers    
-    shreg_data: in std_logic_vector(31 downto 0); -- 8 coefficients per decoder * 4 decoders
-    shreg_shift: in std_logic;
-    shreg_clear: in std_logic;
-    --shreg_ready: in std_logic;
-    shreg_ack: out std_logic;
+    prog_ok: in std_logic;
+    prog_addr: in std_logic_vector(5 downto 0); -- top 2 bits select which of the 4 DVs are being decoded; bottom 4 choose a decoder buffer for that DV
+    prog_we: in std_logic;
+    prog_data: in std_logic_vector(11 downto 0);
     
     -- DV write ports
     dv0_addr: out std_logic_vector(10 downto 0);
@@ -89,21 +87,22 @@ architecture rtl of decoder_unit_bottom_half_1d is
     all_done: out std_logic        
     ); end component;
     
-    component delayed_shift_register     generic (
-        N: integer; -- output width
-        T: integer -- number of shifts to ignore
-    );
-    Port ( clk : in STD_LOGIC;
-           rst : in STD_LOGIC;
-           din : in STD_LOGIC;
-           shift : in STD_LOGIC;         
-           dout : out STD_LOGIC_VECTOR (N-1 downto 0);
-           done: out std_logic
-           ); end component delayed_shift_register;
+   component decoder_coefficient_fifo   PORT (
+      clk : IN STD_LOGIC;
+      rst : IN STD_LOGIC;
+      din : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+      wr_en : IN STD_LOGIC;
+      rd_en : IN STD_LOGIC;
+      dout : OUT STD_LOGIC_VECTOR(11 DOWNTO 0);
+      full : OUT STD_LOGIC;
+      empty : OUT STD_LOGIC
+    ); end component;
            
    type decoder_coefficient_bank is array(0 to 7) of std_logic_vector(11 downto 0);
    type decoder_bank_type is array(0 to 3) of decoder_coefficient_bank;
    signal decoder_bank: decoder_bank_type;
+   signal decoder_bank_feedback: decoder_bank_type;
+   signal decoder_bank_we: std_logic_vector(63 downto 0);
    signal decoder_ack: std_logic_vector(3 downto 0);
    signal decoder_done: std_logic_vector(3 downto 0);
    
@@ -117,18 +116,23 @@ architecture rtl of decoder_unit_bottom_half_1d is
 begin
 
     DECODERS: for I in 0 to 3 generate
-        SHIFT_REGISTERS: for J in 0 to 7 generate
-            SHREG: delayed_shift_register generic map (
-                N => 12,
-                T => skip_count
-            ) port map (
+        FIFOS: for J in 0 to 7 generate
+            FIFO: decoder_coefficient_fifo port map (
                 clk => clk,
-                rst => shreg_clear,
-                din => shreg_data(8*I+J),
-                shift => shreg_shift,
+                rst => rst,
+                din => decoder_bank_feedback(I)(J),
+                wr_en => decoder_bank_we(16 * I + J),
+                rd_en => decoder_ack(I),
                 dout => decoder_bank(I)(J),
-                done => shreg_ready(8*I+J)
+                full => open,
+                empty => open
             );
+            decoder_bank_feedback(I)(J) <= prog_data when prog_ok = '1' else decoder_bank(I)(J);
+            decoder_bank_we(16 * I + J) <= prog_we when (prog_ok = '1' and 
+                -- decode prog_addr: top 2 bits choose an I, bottom 4 bits choose a J
+                to_integer(unsigned(prog_addr(5 downto 4))) = I and
+                to_integer(unsigned(prog_addr(3 downto 0))) = J
+            ) else decoder_ack(I);
         end generate;
         
         DECODER: programmable_decoder_1d generic map (
@@ -153,7 +157,7 @@ begin
             v5 => decoder_bank(I)(5),
             v6 => decoder_bank(I)(6),
             v7 => decoder_bank(I)(7),
-            shreg_ready => shreg_ready(0), -- cheating, as mentioned above
+            shreg_ready => pc_ready, -- even bigger cheating, remove this signal
             data_ack => decoder_ack(I),
             dv_addr => decoder_dv_addr(I),
             dv_we => decoder_dv_we(I),
@@ -165,7 +169,7 @@ begin
     
     -- blatant cheating, but if all shregs finish simultaneously then this is okay
     pc_ack <= decoder_ack(0);
-    shreg_ack <= decoder_ack(0); -- I thiiiink this is what I want here
+    --shreg_ack <= decoder_ack(0); -- I thiiiink this is what I want here
     all_done <= decoder_done(0);
     
     -- dv port wiring

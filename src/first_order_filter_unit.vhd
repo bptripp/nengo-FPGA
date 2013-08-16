@@ -22,6 +22,8 @@ end entity;
 
 architecture rtl of first_order_filter_unit is
 
+attribute mark_debug: string;
+
 component programmable_multiplexed_1filter Port ( 
     clk : in STD_LOGIC;
     rst: in std_logic;
@@ -61,7 +63,7 @@ component filter_state_fifo  PORT (
     empty : OUT STD_LOGIC
 ); end component;
 
-signal filter_x: sfixed(1 downto -16);
+signal filter_x: sfixed(1 downto -16); attribute mark_debug of filter_x: signal is "true";
 signal filter_x1: sfixed(1 downto -16);
 signal filter_we: std_logic;
 signal fifo_full: std_logic;
