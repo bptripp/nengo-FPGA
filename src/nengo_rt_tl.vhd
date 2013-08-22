@@ -8,6 +8,8 @@ use ieee_proposed.fixed_pkg.all;
 library std;
 use std.textio.all;
 
+use work.port_types.all;
+
 entity nengo_rt_tl is generic (
     SIMULATION: string := "FALSE"
 ); port (
@@ -50,6 +52,11 @@ entity nengo_rt_tl is generic (
     prog_nyet: out std_logic;
     prog_error: out std_logic;
     prog_ok: out std_logic; -- HIGH when programming is allowed, i.e. after system reset and before run start
+    page_block_addr: in std_logic_vector(5 downto 0);
+    page_word_addr: in std_logic_vector(10 downto 0);
+    page_we: in std_logic;
+    page_lock: in std_logic;
+    page_data: in std_logic_vector(11 downto 0);
     start: in std_logic; -- Pulse HIGH to begin execution. Ignored while prog_ok is LOW.
     pause: in std_logic; -- Pulse HIGH to pause execution after current timestep. If start also asserted
                          -- on same timestep, single-step the simulation.
@@ -134,6 +141,29 @@ port (
 signal all_decoders_done: std_logic;
 signal timestep: std_logic; attribute mark_debug of timestep: signal is "true";
 
+component mux_to_dv_port     generic (
+        N: integer; -- number of encoders
+        -- assuming we are using 256 DV blocks, we have 512 DV ports and therefore need 9 bits to identify a DV port uniquely (port# + dv block#)
+        -- (and the remaining 11 bits to identify an address within that DV)
+        decode: std_logic_vector(8 downto 0) := "000000000"
+    );
+    Port ( 
+        clk : in STD_LOGIC;
+        data: in encoder_addresses(0 to N-1);
+        output: out std_logic_vector(10 downto 0);
+        selected: out std_logic_vector(N-1 downto 0)
+    ); end component;
+    
+component mux_to_encoding_controller generic(
+            N: integer -- number of DV data ports
+        );
+        Port ( 
+            clk : in STD_LOGIC;
+            data: in dv_data(N-1 downto 0);
+            sel: in std_logic_vector(N-1 downto 0);
+            output: out std_logic_vector(11 downto 0)
+        ); end component;    
+
 component dv_double_buffer port (
         clk: in std_logic;
         rst: in std_logic;
@@ -159,19 +189,32 @@ component dv_double_buffer port (
         prog_we: in std_logic;
         prog_data: in std_logic_vector(11 downto 0)
 ); end component;
+signal swap_banks: std_logic_vector(255 downto 0);
+constant NUMBER_OF_DV_BANKS: integer := 256;
 
-signal swap_banks: std_logic;
-signal dv_rd0_addr: std_logic_vector(10 downto 0); attribute mark_debug of dv_rd0_addr: signal is "true";
-signal dv_rd0_data: std_logic_vector(11 downto 0); attribute mark_debug of dv_rd0_data: signal is "true";
-signal dv_rd1_addr: std_logic_vector(10 downto 0);
-signal dv_rd1_data: std_logic_vector(11 downto 0);
-signal dv_wr0_addr: std_logic_vector(10 downto 0); attribute mark_debug of dv_wr0_addr: signal is "true";
-signal dv_wr0_we: std_logic; attribute mark_debug of dv_wr0_we: signal is "true";
-signal dv_wr0_data: std_logic_vector(11 downto 0); attribute mark_debug of dv_wr0_data: signal is "true";
--- wr1
-signal dv_prog_addr: std_logic_vector(10 downto 0);
-signal dv_prog_we: std_logic;
-signal dv_prog_data: std_logic_vector(11 downto 0); 
+type dv_addr_type is array(0 to NUMBER_OF_DV_BANKS-1) of std_logic_vector(10 downto 0);
+signal dv_rd0_addr: dv_addr_type;
+signal dv_rd0_data: dv_data(NUMBER_OF_DV_BANKS-1 downto 0);
+signal dv_rd1_addr: dv_addr_type;
+signal dv_rd1_data: dv_data(NUMBER_OF_DV_BANKS-1 downto 0);
+signal dv_wr0_addr: dv_addr_type;
+signal dv_wr0_we: std_logic_vector(NUMBER_OF_DV_BANKS-1 downto 0);
+signal dv_wr0_data: dv_data(NUMBER_OF_DV_BANKS-1 downto 0);
+signal dv_wr1_addr: dv_addr_type;
+signal dv_wr1_we: std_logic_vector(NUMBER_OF_DV_BANKS-1 downto 0);
+signal dv_wr1_data: dv_data(NUMBER_OF_DV_BANKS-1 downto 0);
+
+signal page_en: std_logic_vector(63 downto 0); -- for input DV banks
+signal page_wr_en: std_logic_vector(63 downto 0); -- page_we qualified with page_en(N)
+
+component bank_lock port (
+    clk: in std_logic;
+    rst: in std_logic;
+    en: in std_logic;
+    lock: in std_logic;
+    timestep: in std_logic;
+    swap_banks: out std_logic
+); end component;
 
 component delay_line generic (
     N: natural := 1; -- port width
@@ -181,8 +224,6 @@ component delay_line generic (
     d: in std_logic_vector(N-1 downto 0);
     q: out std_logic_vector(N-1 downto 0)
 ); end component;
-signal dv_rd0_data_delayed: std_logic_vector(11 downto 0);
-signal dv_rd1_data_delayed: std_logic_vector(11 downto 0);
 
 component encoder_pipeline_controller     generic (
         N: integer -- number of encoders
@@ -211,10 +252,17 @@ component encoder_unit port (
     prog_we: in std_logic;
     prog_data: in std_logic_vector(39 downto 0)
 ); end component;
+
+constant NUMBER_OF_ENCODERS: integer := 1;
+signal encoder_addr: encoder_addresses(0 to NUMBER_OF_ENCODERS-1);
+signal encoder_data: dv_data(0 to NUMBER_OF_ENCODERS-1);
+
+type encoder_selection_type is array(0 to 2*NUMBER_OF_DV_BANKS-1) of std_logic_vector(NUMBER_OF_ENCODERS-1 downto 0);
+signal encoder_select: encoder_selection_type; -- the idea is that encoder_select(X)(Y) is asserted when mux_to_dv_port for DV port X got addressed by encoder Y
+type reverse_encoder_selection_type is array(0 to NUMBER_OF_ENCODERS-1) of std_logic_vector(2*NUMBER_OF_DV_BANKS-1 downto 0);
+signal reverse_encoder_select: reverse_encoder_selection_type; -- effectively, reverse_encoder_select(X) is the concatenation of encoder_select(*)(X)
+
 signal encoder_next_population: std_logic;
-signal encoder_dv_addr: std_logic_vector(18 downto 0);
-signal encoder_dv_port: std_logic;
-signal encoder_dv_data: std_logic_vector(11 downto 0);
 signal encoder_sum: sfixed(1 downto -10); attribute mark_debug of encoder_sum: signal is "true";
 signal encoder_done: std_logic;
 signal encoder_we: std_logic;
@@ -544,52 +592,96 @@ SEQUENCER: timestep_sequencer generic map (
     timestep_overflow => timestep_overflow
 );
 
-swap_banks <= timestep;
+DECODE_PAGE_EN: for I in 0 to 63 generate
+    page_en(I) <= '1' when (page_block_addr = std_logic_vector(to_unsigned(I, 6))) else '0';
+    page_wr_en(I) <= page_en(I) and page_we;
+end generate;
+
+DEFAULT_SWAP_BANKS: for I in 0 to 191 generate
+    swap_banks(I) <= timestep;
+end generate;
+INPUT_SWAP_BANKS: for I in 192 to 255 generate
+    LOCK: bank_lock port map (
+        clk => clk_125,
+        rst => system_reset,
+        en => page_en(I - 192),
+        lock => page_lock,
+        timestep => timestep,
+        swap_banks => swap_banks(I)
+    );
+end generate;
+
+REVERSE_ENCODER_OUTER: for X in 0 to NUMBER_OF_ENCODERS-1 generate
+    REVERSE_ENCODER_INNER: for Y in 0 to 2*NUMBER_OF_DV_BANKS-1 generate
+        reverse_encoder_select(X)(Y) <= encoder_select(Y)(X);
+    end generate;
+end generate;
+
 DV_BANK0: dv_double_buffer port map (
     clk => clk_125,
     rst => system_reset,
-    swap_banks => swap_banks,
-    rd0_addr => dv_rd0_addr,
-    rd0_data => dv_rd0_data,
-    rd1_addr => dv_rd1_addr,
-    rd1_data => dv_rd1_data,
-    wr0_addr => dv_wr0_addr,
-    wr0_we => dv_wr0_we,
-    wr0_data => dv_wr0_data,
-    wr1_addr => "00000000000",
-    wr1_we => '0',
-    wr1_data => X"000",
+    swap_banks => swap_banks(0),
+    rd0_addr => dv_rd0_addr(0),
+    rd0_data => dv_rd0_data(0),
+    rd1_addr => dv_rd1_addr(0),
+    rd1_data => dv_rd1_data(0),
+    wr0_addr => dv_wr0_addr(0),
+    wr0_we => dv_wr0_we(0),
+    wr0_data => dv_wr0_data(0),
+    wr1_addr => "00000000000", -- dv_wr1_addr(0)
+    wr1_we => '0', -- dv_wr1_we(0)
+    wr1_data => X"000", -- dv_wr1_data(0)
     prog_ok => enable_programming,
     prog_addr => reg.prog_reg_addr(10 downto 0),
     prog_we => reg.prog_dv_we(0),
     prog_data => reg.prog_reg_data(11 downto 0)
 );
-
--- to simulate the multi-cycle delay of the interconnect
-DELAY_RD0: delay_line generic map (
-    N => 12,
-    T => 2
+MUX_TO_DV0_PORT0: mux_to_dv_port generic map (
+    N => NUMBER_OF_ENCODERS,
+    decode => "0" & X"00"
 ) port map (
     clk => clk_125,
-    d => dv_rd0_data,
-    q => dv_rd0_data_delayed
-);
-DELAY_RD1: delay_line generic map (
-    N => 12,
-    T => 2
-) port map (
-    clk => clk_125,
-    d => dv_rd1_data,
-    q => dv_rd1_data_delayed
+    data => encoder_addr,
+    output => dv_rd0_addr(0),
+    selected => encoder_select(0)
 );
 
-ENCODER: encoder_unit port map (
+INPUT_BANK192: dv_double_buffer port map (
+    clk => clk_125,
+    rst => system_reset,
+    swap_banks => swap_banks(192),
+    rd0_addr => dv_rd0_addr(192),
+    rd0_data => dv_rd0_data(192),
+    rd1_addr => dv_rd1_addr(192),
+    rd1_data => dv_rd1_data(192),
+    wr0_addr => page_word_addr,
+    wr0_we => page_wr_en(0),
+    wr0_data => page_data,
+    wr1_addr => "00000000000",
+    wr1_we => '0',
+    wr1_data => X"000",
+    prog_ok => enable_programming,
+    prog_addr => reg.prog_reg_addr(10 downto 0),
+    prog_we => reg.prog_dv_we(192),
+    prog_data => reg.prog_reg_data(11 downto 0)
+);
+MUX_TO_DV192_PORT0: mux_to_dv_port generic map (
+    N => NUMBER_OF_ENCODERS,
+    decode => "0" & X"C0"
+) port map (
+    clk => clk_125,
+    data => encoder_addr,
+    output => dv_rd0_addr(192),
+    selected => encoder_select(192)
+);
+
+ENCODER0: encoder_unit port map (
     clk => clk_125,
     rst => system_reset,
     next_population => encoder_next_population,
-    dv_addr => encoder_dv_addr,
-    dv_port => encoder_dv_port,
-    dv_data => encoder_dv_data,
+    dv_addr => encoder_addr(0)(18 downto 0),
+    dv_port => encoder_addr(0)(19),
+    dv_data => encoder_data(0),
     sum => encoder_sum,
     done => encoder_done,
     we => encoder_we,
@@ -598,9 +690,15 @@ ENCODER: encoder_unit port map (
     prog_we => reg.prog_encoder_we(0),
     prog_data => reg.prog_reg_data(39 downto 0)
 );
-dv_rd0_addr <= encoder_dv_addr(10 downto 0);
-encoder_dv_data <= dv_rd0_data_delayed;
-dv_rd1_addr <= encoder_dv_addr(10 downto 0); -- FIXME CHEATING
+MUX_TO_ENCODER0: mux_to_encoding_controller generic map (
+    N => 2*NUMBER_OF_DV_BANKS
+) port map (
+    clk => clk_125,
+    data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
+    data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
+    sel => reverse_encoder_select(0),
+    output => encoder_data(0)
+);
 
 ENCODER_PIPE_CTRL: encoder_pipeline_controller generic map (
         N => 1
@@ -697,9 +795,9 @@ DECODER_BOTTOM_HALF: decoder_unit_bottom_half_1d generic map (
     prog_we => reg.prog_decoder_memory_we(0),
     prog_data => reg.prog_reg_data(11 downto 0),
     
-    dv0_addr => dv_wr0_addr,
-    dv0_we => dv_wr0_we,
-    dv0_data => dv_wr0_data,
+    dv0_addr => dv_wr0_addr(0),
+    dv0_we => dv_wr0_we(0),
+    dv0_data => dv_wr0_data(0),
     dv1_addr => open,
     dv1_we => open,
     dv1_data => open,

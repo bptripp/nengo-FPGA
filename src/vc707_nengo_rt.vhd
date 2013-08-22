@@ -179,6 +179,12 @@ component ethernet_rx_handler port (
     prog_we: out std_logic;
     prog_data: out std_logic_vector(39 downto 0);
     
+    page_block_addr: out std_logic_vector(5 downto 0);
+    page_word_addr: out std_logic_vector(10 downto 0);
+    page_we: out std_logic;
+    page_lock: out std_logic;
+    page_data: out std_logic_vector(11 downto 0);
+    
     prog_ok: in std_logic;
     prog_ack: in std_logic;
     prog_nyet: in std_logic;
@@ -193,6 +199,11 @@ signal prog_data: std_logic_vector(39 downto 0);
 signal prog_ok: std_logic; 
 signal prog_ack: std_logic; 
 signal prog_nyet: std_logic;
+signal page_block_addr: std_logic_vector(5 downto 0);
+signal page_word_addr: std_logic_vector(10 downto 0);
+signal page_we: std_logic;
+signal page_lock: std_logic;
+signal page_data: std_logic_vector(11 downto 0);
 signal system_reset: std_logic;
 signal sim_start: std_logic;
 signal sim_pause: std_logic;
@@ -210,6 +221,11 @@ component nengo_rt_tl generic (
     prog_nyet: out std_logic;
     prog_error: out std_logic;
     prog_ok: out std_logic; -- HIGH when programming is allowed, i.e. after system reset and before run start
+    page_block_addr: in std_logic_vector(5 downto 0);
+    page_word_addr: in std_logic_vector(10 downto 0);
+    page_we: in std_logic;
+    page_lock: in std_logic;
+    page_data: in std_logic_vector(11 downto 0);
     start: in std_logic; -- Pulse HIGH to begin execution. Ignored while prog_ok is LOW.
     pause: in std_logic; -- Pulse HIGH to pause execution after current timestep. If start also asserted
                          -- on same timestep, single-step the simulation.
@@ -322,6 +338,11 @@ RX_HANDLER: ethernet_rx_handler port map (
     prog_addr => prog_addr,
     prog_we => prog_we,
     prog_data => prog_data,
+    page_block_addr => page_block_addr,
+    page_word_addr => page_word_addr,
+    page_we => page_we,
+    page_lock => page_lock,
+    page_data => page_data,
     prog_ok => prog_ok,
     prog_ack => prog_ack,
     prog_nyet => prog_nyet,
@@ -340,6 +361,11 @@ NENGO: nengo_rt_tl generic map (SIMULATION => "FALSE") port map (
     prog_nyet => prog_nyet,
     prog_error => open, -- FIXME programming module can't handle this yet
     prog_ok => prog_ok,
+    page_block_addr => page_block_addr,
+    page_word_addr => page_word_addr,
+    page_we => page_we,
+    page_lock => page_lock,
+    page_data => page_data,
     start => sim_start,
     pause => sim_pause,
     running => sim_running,

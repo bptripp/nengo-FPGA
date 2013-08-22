@@ -57,6 +57,11 @@ component nengo_rt_tl generic (
     prog_nyet: out std_logic;
     prog_error: out std_logic;
     prog_ok: out std_logic; -- HIGH when programming is allowed, i.e. after system reset and before run start
+    page_block_addr: in std_logic_vector(5 downto 0);
+    page_word_addr: in std_logic_vector(10 downto 0);
+    page_we: in std_logic;
+    page_lock: in std_logic;
+    page_data: in std_logic_vector(11 downto 0);
     start: in std_logic; -- Pulse HIGH to begin execution. Ignored while prog_ok is LOW.
     pause: in std_logic; -- Pulse HIGH to pause execution after current timestep. If start also asserted
                          -- on same timestep, single-step the simulation.
@@ -72,6 +77,11 @@ signal prog_ack: std_logic;
 signal prog_nyet: std_logic;
 signal prog_error: std_logic;
 signal prog_ok: std_logic;
+signal page_block_addr: std_logic_vector(5 downto 0);
+signal page_word_addr: std_logic_vector(10 downto 0);
+signal page_we: std_logic;
+signal page_lock: std_logic;
+signal page_data: std_logic_vector(11 downto 0);
 signal start: std_logic;
 signal pause: std_logic;
 signal running: std_logic;
@@ -393,6 +403,11 @@ uut: nengo_rt_tl generic map ( SIMULATION => "TRUE") port map (
     prog_nyet => prog_nyet,
     prog_error => prog_error,
     prog_ok => prog_ok,
+    page_block_addr => page_block_addr,
+    page_word_addr => page_word_addr,
+    page_we => page_we,
+    page_lock => page_lock,
+    page_data => page_data,
     start => start,
     pause => pause,
     running => running,
@@ -407,6 +422,11 @@ begin
     prog_addr <= (others=>'0');
     prog_we <= '0';
     prog_data <= (others=>'0');
+    page_block_addr <= (others=>'0');
+    page_word_addr <= (others=>'0');
+    page_we <= '0';
+    page_lock <= '0';
+    page_data <= (others=>'0');
     start <= '0';
     pause <= '0';
     
@@ -422,15 +442,17 @@ begin
     -- "100" - Principal Component sample space
     -- "101" - Decoder memory circular buffers
     
-    -- program DV#0: addresses 0 to 1023 get X"000" (feedback/output range), addresses 1024 to 2047 get to_sfixed(0.5, 1,-10) (input range)
-    for I in 0 to 2047 loop 
-        if(I > 1023) then
-            tmp_dv_data := to_slv(to_sfixed(0.5, 1,-10));
-        else
-            tmp_dv_data := X"000";
-        end if;
+    -- program DV#0: addresses 0 to 1023 get X"000" (feedback/output range)
+    for I in 0 to 1023 loop 
+        tmp_dv_data := X"000";
         PROGRAM_DV_BUFFER(0, I, tmp_dv_data,
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+    end loop;
+    -- program DV#192: addresses 0 to 1023 get to_sfixed(0.5, 1,-10) (input range)
+    for I in 0 to 1023 loop
+        tmp_dv_data := to_slv(to_sfixed(0.5, 1,-10));                
+        PROGRAM_DV_BUFFER(192, I, tmp_dv_data,
+            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
     end loop;
     
     -- program encoder#0: 1.0*Xi + 0.1*Ui
@@ -440,7 +462,7 @@ begin
             "0" & "0000000" & "0" & "00000000" & "0" & std_logic_vector(addr_counter) & to_slv(to_sfixed(1.0, 1,-10)),
             clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
         PROGRAM_ENCODER(0, 0,
-            "1" & "0000000" & "0" & "00000000" & "1" & std_logic_vector(addr_counter) & to_slv(to_sfixed(0.1, 1,-10)),
+            "1" & "0000000" & "0" & "11000000" & "0" & std_logic_vector(addr_counter) & to_slv(to_sfixed(0.1, 1,-10)),
             clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
     end loop;
     
