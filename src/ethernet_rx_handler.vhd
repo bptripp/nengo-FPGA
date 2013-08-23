@@ -182,10 +182,10 @@ begin
                 case frame_data is
                     when X"00" => -- WRITE (PROGRAM)                 
                         ci.state := state_cmd_write;
-                        ci.skip_count := "00000111"; -- read 7+1 bytes (3 address, 5 data)
+                        ci.skip_count := "000111"; -- read 7+1 bytes (3 address, 5 data)
                     when X"01" => -- PAGE WRITE (INPUT)
                         ci.state := state_cmd_pagewrite_header;
-                        ci.skip_count := "00000010"; -- read 2+1 bytes (2 address, 1 count)
+                        ci.skip_count := "000010"; -- read 2+1 bytes (2 address, 1 count)
                     when X"FC" => -- PAUSE RUN
                         ci.sim_pause := '1';
                         ci.state := state_interframe;

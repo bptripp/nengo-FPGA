@@ -15,7 +15,7 @@ entity vc707_nengo_rt is port (
     
     RST: in std_logic;
     
-    GPIO_DIP: in std_logic_vector(7 downto 0);
+    --GPIO_DIP: in std_logic_vector(7 downto 0);
     GPIO_LED: out std_logic_vector(7 downto 0)
 ); end entity vc707_nengo_rt;
 
@@ -52,7 +52,7 @@ signal mgtrefclk: std_logic;
 signal userclk: std_logic;
 signal userclk2: std_logic;
 
-component sgmii_vc707 generic
+component sgmii_vc707_block generic
 (
     EXAMPLE_SIMULATION                      : integer   := 0          -- Set to 1 for simulation
 );
@@ -115,7 +115,7 @@ component sgmii_vc707 generic
       reset                : in std_logic;                     -- Asynchronous reset for entire core.
       signal_detect        : in std_logic                      -- Input from PMD to indicate presence of optical input.
 
-      ); end component sgmii_vc707;
+      ); end component sgmii_vc707_block;
     signal resetdone: std_logic;
     signal sgmii_clk_r: std_logic;
     signal sgmii_clk_f: std_logic;
@@ -256,7 +256,7 @@ mmcm_reset <= RST or not resetdone;
 PHY_RESET <= not RST; -- active_low
 
 
-SGMII: sgmii_vc707 generic map ( EXAMPLE_SIMULATION => 0) port map (
+SGMII: sgmii_vc707_block generic map ( EXAMPLE_SIMULATION => 0) port map (
     drpaddr_in => "000000000",
     drpclk_in => '0',
     drpdi_in => X"0000",
@@ -378,7 +378,7 @@ GPIO_LED(2) <= '0';
 GPIO_LED(3) <= '0';
 GPIO_LED(4) <= '0';
 GPIO_LED(5) <= '0';
-GPIO_LED(6) <= '0';
+GPIO_LED(6) <= timestep_overflow; -- FIXME slow down this signal so we can see it
 GPIO_LED(7) <= sim_running;
 
 end architecture TOPLEVEL;

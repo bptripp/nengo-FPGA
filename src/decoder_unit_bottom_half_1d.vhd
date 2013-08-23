@@ -134,6 +134,9 @@ begin
                 to_integer(unsigned(prog_addr(3 downto 0))) = J
             ) else decoder_ack(I);
         end generate;
+        DRIVE_UNUSED_DECODERS: for J in 8 to 15 generate
+            decoder_bank_we(16 * I + J) <= '0';
+        end generate;
         
         DECODER: programmable_decoder_1d generic map (
             shift => shift

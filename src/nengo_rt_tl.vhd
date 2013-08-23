@@ -68,6 +68,7 @@ end entity;
 architecture rtl of nengo_rt_tl is
 
 attribute mark_debug: string;
+attribute keep: string;
 
 component synchronizer   generic(
     G_INIT_VALUE    : std_logic := '0'; -- initial value of all flip-flops in the module
@@ -140,6 +141,7 @@ port (
 ); end component;
 signal all_decoders_done: std_logic;
 signal timestep: std_logic; attribute mark_debug of timestep: signal is "true";
+signal timestep_overflow_stb: std_logic;
 
 component mux_to_dv_port     generic (
         N: integer; -- number of encoders
@@ -189,9 +191,9 @@ component dv_double_buffer port (
         prog_we: in std_logic;
         prog_data: in std_logic_vector(11 downto 0)
 ); end component;
-signal swap_banks: std_logic_vector(255 downto 0);
-constant NUMBER_OF_DV_BANKS: integer := 256;
+constant NUMBER_OF_DV_BANKS: integer := 2;
 
+signal swap_banks: std_logic_vector(NUMBER_OF_DV_BANKS-1 downto 0);
 type dv_addr_type is array(0 to NUMBER_OF_DV_BANKS-1) of std_logic_vector(10 downto 0);
 signal dv_rd0_addr: dv_addr_type;
 signal dv_rd0_data: dv_data(NUMBER_OF_DV_BANKS-1 downto 0);
@@ -216,42 +218,6 @@ component bank_lock port (
     swap_banks: out std_logic
 ); end component;
 
-component delay_line generic (
-    N: natural := 1; -- port width
-    T: natural := 0
-); port (
-    clk: in std_logic;
-    d: in std_logic_vector(N-1 downto 0);
-    q: out std_logic_vector(N-1 downto 0)
-); end component;
-
-component encoder_pipeline_controller     generic (
-        N: integer -- number of encoders
-    );
-    port (
-        clk: in std_logic;
-        encoder_done: in std_logic_vector(N-1 downto 0);
-        timestep: in std_logic;
-        fifo_full: in std_logic_vector(N-1 downto 0);
-        
-        encode_next: out std_logic
-    ); end component;
-
-component encoder_unit port (
-    clk: in std_logic;
-    rst: in std_logic;
-    next_population: in std_logic;
-    dv_addr: out std_logic_vector(18 downto 0);
-    dv_port: out std_logic;
-    dv_data: in std_logic_vector(11 downto 0);
-    sum: out sfixed(1 downto -10);
-    done: out std_logic;
-    we: out std_logic;
-    
-    prog_ok: in std_logic;
-    prog_we: in std_logic;
-    prog_data: in std_logic_vector(39 downto 0)
-); end component;
 
 constant NUMBER_OF_ENCODERS: integer := 1;
 signal encoder_addr: encoder_addresses(0 to NUMBER_OF_ENCODERS-1);
@@ -262,221 +228,48 @@ signal encoder_select: encoder_selection_type; -- the idea is that encoder_selec
 type reverse_encoder_selection_type is array(0 to NUMBER_OF_ENCODERS-1) of std_logic_vector(2*NUMBER_OF_DV_BANKS-1 downto 0);
 signal reverse_encoder_select: reverse_encoder_selection_type; -- effectively, reverse_encoder_select(X) is the concatenation of encoder_select(*)(X)
 
-signal encoder_next_population: std_logic;
-signal encoder_sum: sfixed(1 downto -10); attribute mark_debug of encoder_sum: signal is "true";
-signal encoder_done: std_logic;
-signal encoder_we: std_logic;
-signal encoder_prog_we: std_logic;
-signal encoder_prog_data: std_logic_vector(39 downto 0);
-
-component encoder_fifo  PORT (
-    clk : IN STD_LOGIC;
-    rst : IN STD_LOGIC;
-    din : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
-    wr_en : IN STD_LOGIC;
-    rd_en : IN STD_LOGIC;
-    dout : OUT STD_LOGIC_VECTOR(11 DOWNTO 0);
-    full : OUT STD_LOGIC;
-    almost_full : OUT STD_LOGIC;
-    empty : OUT STD_LOGIC
-  ); end component;
-signal encoder_fifo_din: std_logic_vector(11 downto 0);
-signal encoder_fifo_we: std_logic;
-signal encoder_fifo_re: std_logic;
-signal encoder_fifo_dout: std_logic_vector(11 downto 0);
-signal encoder_fifo_full: std_logic;
-signal encoder_fifo_almost_full: std_logic;
-signal encoder_fifo_empty: std_logic;
-
-component first_order_filter_unit port (
-    clk: in std_logic;
-    rst: in std_logic;
-    u: in sfixed(1 downto -10);
-    valid: in std_logic;
-    y: out sfixed(1 downto -10);
-    ready: out std_logic;
-    ready_stb: out std_logic;
-    ack: in std_logic;
-    
-    prog_addr: in std_logic_vector(1 downto 0);
-    prog_we: in std_logic;
-    prog_data: in std_logic_vector(11 downto 0)
-); end component;
-signal h1_u: sfixed(1 downto -10); attribute mark_debug of h1_u: signal is "true";
-signal h1_valid: std_logic;
-signal h1_y: sfixed(1 downto -10); attribute mark_debug of h1_y: signal is "true";
-signal h1_ready: std_logic;
-signal h1_ready_stb: std_logic;
-signal h1_ack: std_logic;
-signal h1_prog_addr: std_logic_vector(1 downto 0);
-signal h1_prog_we: std_logic;
-signal h1_prog_data: std_logic_vector(11 downto 0);
-
-component pipelined_adder port (
-    clk: in std_logic;
-    rst: in std_logic;
-    
-    a: in sfixed(1 downto -10);
-    a_valid: in std_logic;
-    b: in sfixed(1 downto -10);
-    b_valid: in std_logic;
-    sum: out sfixed(1 downto -10);
-    sum_ready: out std_logic;
-    sum_ack: in std_logic
-); end component pipelined_adder;
-
-component decoder_unit_top_half_1d port (
-    clk: in std_logic;
-    rst: in std_logic;    
-    encoder_fifo_u: in std_logic_vector(11 downto 0);
-    encoder_fifo_empty: in std_logic;
-    encoder_fifo_rd_en: out std_logic;
-    pc0: out std_logic_vector(11 downto 0);
-    pc1: out std_logic_vector(11 downto 0);
-    pc2: out std_logic_vector(11 downto 0);
-    pc3: out std_logic_vector(11 downto 0);
-    pc4: out std_logic_vector(11 downto 0);
-    pc5: out std_logic_vector(11 downto 0);
-    pc6: out std_logic_vector(11 downto 0);
-    pc7: out std_logic_vector(11 downto 0);
-    pc_valid: out std_logic;
-    pc_ack: in std_logic;
-    
-    -- programming interface
-    pc_prog_addr: in std_logic_vector(13 downto 0); -- top bit unused (due to only 7 PCs); 12 downto 10 chooses a PC; 9 downto 0 addresses in PC
-    pc_prog_we: in std_logic;
-    pc_prog_data: in std_logic_vector(11 downto 0);
-    
-    normal_prog_addr: in std_logic_vector(1 downto 0);
-    normal_prog_we: in std_logic;
-    normal_prog_data: in std_logic_vector(31 downto 0)
-); end component;
-signal decoder_u: std_logic_vector(11 downto 0);
-signal decoder_empty: std_logic;
-signal decoder_rd_en: std_logic;
-signal decoder_pc0: std_logic_vector(11 downto 0);
-signal decoder_pc1: std_logic_vector(11 downto 0);
-signal decoder_pc2: std_logic_vector(11 downto 0);
-signal decoder_pc3: std_logic_vector(11 downto 0);
-signal decoder_pc4: std_logic_vector(11 downto 0);
-signal decoder_pc5: std_logic_vector(11 downto 0);
-signal decoder_pc6: std_logic_vector(11 downto 0);
-signal decoder_pc7: std_logic_vector(11 downto 0);
-signal decoder_valid: std_logic;
-signal decoder_ack: std_logic;
-
-signal decoder_pc_prog_addr: std_logic_vector(13 downto 0);
-signal decoder_pc_prog_we: std_logic;
-signal decoder_pc_prog_data: std_logic_vector(11 downto 0);
-
-signal decoder_normal_prog_addr: std_logic_vector(1 downto 0);
-signal decoder_normal_prog_we: std_logic;
-signal decoder_normal_prog_data: std_logic_vector(31 downto 0);
-
-    type PrincipalComponentMemoryType is array(0 to 1023) of std_logic_vector(11 downto 0);
-          
-    impure function InitPCFromFile (FileName: in string) return PrincipalComponentMemoryType is
-        FILE ROMFile : text is in FileName;
-        variable ROMFileLine : line;
-        variable ROM: PrincipalComponentMemoryType;
-        variable tmp: bit_vector(11 downto 0);
-    begin
-        for I in PrincipalComponentMemoryType'range loop
-            readline(ROMFile, ROMFileLine);
-            read(ROMFileLine, tmp);
-            ROM(I) := to_stdlogicvector(tmp);
-        end loop;
-        return ROM;
-    end function;  
-
-component decoder_unit_bottom_half_1d generic (
-    shift: integer := 0;
-    skip_count: integer -- for shift register
-); port (
-clk: in std_logic;
-rst: in std_logic;
-
--- from top-half
-pc0: in std_logic_vector(11 downto 0);
-pc1: in std_logic_vector(11 downto 0);
-pc2: in std_logic_vector(11 downto 0);
-pc3: in std_logic_vector(11 downto 0);
-pc4: in std_logic_vector(11 downto 0);
-pc5: in std_logic_vector(11 downto 0);
-pc6: in std_logic_vector(11 downto 0);
-pc7: in std_logic_vector(11 downto 0);
-pc_ready: in std_logic;
-pc_ack: out std_logic;
-
-prog_ok: in std_logic;
-prog_addr: in std_logic_vector(5 downto 0); -- top 2 bits select which of the 4 DVs are being decoded; bottom 4 choose a decoder buffer for that DV
-prog_we: in std_logic;
-prog_data: in std_logic_vector(11 downto 0);
-
--- DV write ports
-dv0_addr: out std_logic_vector(10 downto 0);
-dv0_we: out std_logic;
-dv0_data: out std_logic_vector(11 downto 0);
-dv1_addr: out std_logic_vector(10 downto 0);
-dv1_we: out std_logic;
-dv1_data: out std_logic_vector(11 downto 0);
-dv2_addr: out std_logic_vector(10 downto 0);
-dv2_we: out std_logic;
-dv2_data: out std_logic_vector(11 downto 0);
-dv3_addr: out std_logic_vector(10 downto 0);
-dv3_we: out std_logic;
-dv3_data: out std_logic_vector(11 downto 0);
-
-timestep: in std_logic;
-all_done: out std_logic
-    
-); end component;
-signal decoder_bottom_half_all_done: std_logic;
-
-component decoder_fifo PORT (
-    rst : IN STD_LOGIC;
-    wr_clk : IN STD_LOGIC;
-    rd_clk : IN STD_LOGIC;
-    din : IN STD_LOGIC_VECTOR(511 DOWNTO 0);
-    wr_en : IN STD_LOGIC;
-    rd_en : IN STD_LOGIC;
-    dout : OUT STD_LOGIC_VECTOR(511 DOWNTO 0);
-    full : OUT STD_LOGIC;
-    empty : OUT STD_LOGIC;
-    wr_data_count : OUT STD_LOGIC_VECTOR(5 DOWNTO 0)
-  ); end component;
-signal decoder_coefficient_fifo_rst: std_logic;
-signal decoder_coefficient_fifo_rst_125: std_logic;
-signal decoder_coefficient_fifo_din: std_logic_vector(511 downto 0);
-signal decoder_coefficient_fifo_wr_en: std_logic;
-signal decoder_coefficient_fifo_full: std_logic;
-signal decoder_coefficient_fifo_dout: std_logic_vector(511 downto 0);
-signal decoder_coefficient_fifo_empty: std_logic;
-signal decoder_coefficient_fifo_wr_data_count: std_logic_vector(5 downto 0);
-
-component shift_controller generic (
-    N: natural := 1; -- number of acknowledge lines
-    C: unsigned(7 downto 0) -- shift count to load all decoders, usually 72 or 144 for 96 1-D or 96 2-D population units respectively
-); 
-port (
-    clk: in std_logic;
-    rst: in std_logic;
-    invalidate: in std_logic;
-    fifo_data: in std_logic_vector(511 downto 0);
-    fifo_empty: in std_logic;
-    fifo_rd_en: out std_logic;
-    shift_data: out std_logic_vector(511 downto 0);
-    shift_clear: out std_logic;
-    shift_en: out std_logic;
-    shift_ack: in std_logic_vector(N-1 downto 0)
-); end component;
-signal shift_fifo_rd_en: std_logic;
-signal shift_data: std_logic_vector(511 downto 0);
-signal shift_clear: std_logic;
-signal shift_en: std_logic;
-signal shift_ack: std_logic_vector(0 downto 0);
-signal shctl_invalidate: std_logic;
-signal shctl_invalidate_125: std_logic;
+component population_unit_1d port (
+	clk: in std_logic;
+	rst: in std_logic;
+	timestep: in std_logic;
+	all_done: out std_logic; -- from decoder bottom half
+	
+	-- encoder 0 connection to DV interconnect
+	encoder0_dv_addr: out std_logic_vector(18 downto 0);
+	encoder0_dv_port: out std_logic;
+	encoder0_dv_data: in std_logic_vector(11 downto 0);
+	-- encoder 1 connection to DV interconnect
+	encoder1_dv_addr: out std_logic_vector(18 downto 0);
+	encoder1_dv_port: out std_logic;
+	encoder1_dv_data: in std_logic_vector(11 downto 0);
+	-- decoder 0 connection to DV block
+	decoder0_dv_addr: out std_logic_vector(10 downto 0);
+	decoder0_dv_we: out std_logic;
+	decoder0_dv_data: out std_logic_vector(11 downto 0);
+	-- decoder 1 connection to DV block
+	decoder1_dv_addr: out std_logic_vector(10 downto 0);
+	decoder1_dv_we: out std_logic;
+	decoder1_dv_data: out std_logic_vector(11 downto 0);
+	-- decoder 2 connection to DV block
+	decoder2_dv_addr: out std_logic_vector(10 downto 0);
+	decoder2_dv_we: out std_logic;
+	decoder2_dv_data: out std_logic_vector(11 downto 0);
+	-- decoder 3 connection to DV block
+	decoder3_dv_addr: out std_logic_vector(10 downto 0);
+	decoder3_dv_we: out std_logic;
+	decoder3_dv_data: out std_logic_vector(11 downto 0);
+	-- programming interface shared addr/data
+	prog_ok: in std_logic;
+	prog_addr: in std_logic_vector(20 downto 0);
+	prog_data: in std_logic_vector(39 downto 0);
+	-- programming interface target write-enable
+	prog_encoder_we: in std_logic_vector(1 downto 0);
+	prog_pc_filter_we: in std_logic_vector(1 downto 0);
+	prog_pc_lfsr_we: in std_logic;
+	prog_pc_we: in std_logic;
+	prog_decoder_memory_we: in std_logic	
+); end component population_unit_1d;
+signal all_done: std_logic_vector(0 downto 0);
 
 begin
 
@@ -589,22 +382,27 @@ SEQUENCER: timestep_sequencer generic map (
     
     running => run_started,
     timestep => timestep,
-    timestep_overflow => timestep_overflow
+    timestep_overflow => timestep_overflow_stb
 );
+
+-- FIXME BLATANT CHEATING to stop XST from optimizing most of the design out
+timestep_overflow <= timestep_overflow_stb or dv_rd0_data(0)(0) or dv_rd0_data(0)(1) or dv_rd0_data(0)(2) or dv_rd0_data(0)(3)
+or dv_rd0_data(0)(4) or dv_rd0_data(0)(5) or dv_rd0_data(0)(6) or dv_rd0_data(0)(7) or dv_rd0_data(0)(8) or dv_rd0_data(0)(9)
+or dv_rd0_data(0)(10) or dv_rd0_data(0)(11);
 
 DECODE_PAGE_EN: for I in 0 to 63 generate
     page_en(I) <= '1' when (page_block_addr = std_logic_vector(to_unsigned(I, 6))) else '0';
     page_wr_en(I) <= page_en(I) and page_we;
 end generate;
 
-DEFAULT_SWAP_BANKS: for I in 0 to 191 generate
+DEFAULT_SWAP_BANKS: for I in 0 to 0 generate
     swap_banks(I) <= timestep;
 end generate;
-INPUT_SWAP_BANKS: for I in 192 to 255 generate
+INPUT_SWAP_BANKS: for I in 1 to NUMBER_OF_DV_BANKS-1 generate
     LOCK: bank_lock port map (
         clk => clk_125,
         rst => system_reset,
-        en => page_en(I - 192),
+        en => page_en(I-1),
         lock => page_lock,
         timestep => timestep,
         swap_banks => swap_banks(I)
@@ -628,9 +426,9 @@ DV_BANK0: dv_double_buffer port map (
     wr0_addr => dv_wr0_addr(0),
     wr0_we => dv_wr0_we(0),
     wr0_data => dv_wr0_data(0),
-    wr1_addr => "00000000000", -- dv_wr1_addr(0)
-    wr1_we => '0', -- dv_wr1_we(0)
-    wr1_data => X"000", -- dv_wr1_data(0)
+    wr1_addr => dv_wr1_addr(0),
+    wr1_we => dv_wr1_we(0),
+    wr1_data => dv_wr1_data(0),
     prog_ok => enable_programming,
     prog_addr => reg.prog_reg_addr(10 downto 0),
     prog_we => reg.prog_dv_we(0),
@@ -649,11 +447,11 @@ MUX_TO_DV0_PORT0: mux_to_dv_port generic map (
 INPUT_BANK192: dv_double_buffer port map (
     clk => clk_125,
     rst => system_reset,
-    swap_banks => swap_banks(192),
-    rd0_addr => dv_rd0_addr(192),
-    rd0_data => dv_rd0_data(192),
-    rd1_addr => dv_rd1_addr(192),
-    rd1_data => dv_rd1_data(192),
+    swap_banks => swap_banks(1),
+    rd0_addr => dv_rd0_addr(1),
+    rd0_data => dv_rd0_data(1),
+    rd1_addr => dv_rd1_addr(1),
+    rd1_data => dv_rd1_data(1),
     wr0_addr => page_word_addr,
     wr0_we => page_wr_en(0),
     wr0_data => page_data,
@@ -671,25 +469,17 @@ MUX_TO_DV192_PORT0: mux_to_dv_port generic map (
 ) port map (
     clk => clk_125,
     data => encoder_addr,
-    output => dv_rd0_addr(192),
-    selected => encoder_select(192)
+    output => dv_rd0_addr(1),
+    selected => encoder_select(1)
 );
 
-ENCODER0: encoder_unit port map (
-    clk => clk_125,
-    rst => system_reset,
-    next_population => encoder_next_population,
-    dv_addr => encoder_addr(0)(18 downto 0),
-    dv_port => encoder_addr(0)(19),
-    dv_data => encoder_data(0),
-    sum => encoder_sum,
-    done => encoder_done,
-    we => encoder_we,
-    
-    prog_ok => enable_programming,
-    prog_we => reg.prog_encoder_we(0),
-    prog_data => reg.prog_reg_data(39 downto 0)
-);
+-- FIXME the following generate blocks must be updated when more DV blocks are added
+encoder_select(2) <= (others=>'0');
+encoder_select(3) <= (others=>'0');
+dv_rd1_addr(0) <= dv_rd0_addr(0);
+dv_rd1_addr(1) <= dv_rd0_addr(1);
+
+
 MUX_TO_ENCODER0: mux_to_encoding_controller generic map (
     N => 2*NUMBER_OF_DV_BANKS
 ) port map (
@@ -700,116 +490,44 @@ MUX_TO_ENCODER0: mux_to_encoding_controller generic map (
     output => encoder_data(0)
 );
 
-ENCODER_PIPE_CTRL: encoder_pipeline_controller generic map (
-        N => 1
-    )
-    port map (
-        clk => clk_125,
-        encoder_done(0) => encoder_done,
-        timestep => timestep,
-        fifo_full(0) => encoder_fifo_almost_full,
-        
-        encode_next => encoder_next_population
-    );
-
-ENCODER_PIPE: encoder_fifo  PORT MAP (
-    clk => clk_125,
-    rst => system_reset,
-    din => encoder_fifo_din,
-    wr_en => encoder_fifo_we,
-    rd_en => encoder_fifo_re,
-    dout => encoder_fifo_dout,
-    full => encoder_fifo_full,
-    almost_full => encoder_fifo_almost_full,
-    empty => encoder_fifo_empty
-  );
-encoder_fifo_din <= to_slv(encoder_sum);
-encoder_fifo_we <= encoder_we;
-
-H1: first_order_filter_unit port map (
-    clk => clk_125,
-    rst => system_reset,
-    u => h1_u,
-    valid => h1_valid,
-    y => h1_y,
-    ready => h1_ready,
-    ready_stb => h1_ready_stb,
-    ack => h1_ack,
-
-    prog_addr => reg.prog_reg_addr(1 downto 0),
-    prog_we => reg.prog_pc_filter_we(0),
-    prog_data => reg.prog_reg_data(11 downto 0)
+POPULATION_UNIT_0: population_unit_1d port map (
+	clk => clk_125,
+	rst => system_reset,
+	timestep => timestep,
+	all_done => all_done(0),
+	
+	encoder0_dv_addr => encoder_addr(0)(18 downto 0),
+	encoder0_dv_port => encoder_addr(0)(19),
+	encoder0_dv_data => encoder_data(0),
+	-- FIXME temporarily not using encoder #1
+	encoder1_dv_addr => open,
+	encoder1_dv_port => open,
+	encoder1_dv_data => (others=>'0'),
+	
+	decoder0_dv_addr => dv_wr0_addr(0),
+	decoder0_dv_we => dv_wr0_we(0),
+	decoder0_dv_data => dv_wr0_data(0),
+	decoder1_dv_addr => dv_wr1_addr(0),
+	decoder1_dv_we => dv_wr1_we(0),
+	decoder1_dv_data => dv_wr1_data(0),
+	-- FIXME temporarily not using decoders #2 and #3
+	decoder2_dv_addr => open,
+	decoder2_dv_we => open,
+	decoder2_dv_data => open,
+	decoder3_dv_addr => open,
+	decoder3_dv_we => open,
+	decoder3_dv_data => open,
+	
+	prog_ok => enable_programming,
+	prog_addr => reg.prog_reg_addr,
+	prog_data => reg.prog_reg_data,
+	prog_encoder_we => reg.prog_encoder_we(1 downto 0), -- 2 and 3 reserved
+	prog_pc_filter_we => reg.prog_pc_filter_we(1 downto 0), -- 2 and 3 reserved
+	prog_pc_lfsr_we => reg.prog_pc_lfsr_we(0),
+	prog_pc_we => reg.prog_pc_we(0),
+	prog_decoder_memory_we => reg.prog_decoder_memory_we(0)
 );
-h1_u <= to_sfixed(encoder_fifo_dout, 1,-10);
-h1_valid <= '1' when (encoder_fifo_empty = '0') else '0';
-encoder_fifo_re <= h1_ready_stb;
 
-DECODER_TOP_HALF: decoder_unit_top_half_1d port map (
-    clk => clk_125,
-    rst => system_reset,
-    encoder_fifo_u => decoder_u,
-    encoder_fifo_empty => decoder_empty,
-    encoder_fifo_rd_en => decoder_rd_en,
-    pc0 => decoder_pc0,
-    pc1 => decoder_pc1,
-    pc2 => decoder_pc2,
-    pc3 => decoder_pc3,
-    pc4 => decoder_pc4,
-    pc5 => decoder_pc5,
-    pc6 => decoder_pc6,
-    pc7 => decoder_pc7,
-    pc_valid => decoder_valid,
-    pc_ack => decoder_ack,
-    
-    pc_prog_addr => reg.prog_reg_addr(13 downto 0),
-    pc_prog_we => reg.prog_pc_we(0),
-    pc_prog_data => reg.prog_reg_data(11 downto 0),
-    
-    normal_prog_addr => reg.prog_reg_addr(1 downto 0),
-    normal_prog_we => reg.prog_pc_lfsr_we(0),
-    normal_prog_data => reg.prog_reg_data(31 downto 0)
-);
-decoder_u <= to_slv(h1_y);
-decoder_empty <= '1' when h1_ready = '0' else '0';
-h1_ack <= decoder_rd_en;
-
-DECODER_BOTTOM_HALF: decoder_unit_bottom_half_1d generic map (
-    shift => 0,
-    skip_count => 0
-) port map (
-    clk => clk_125,
-    rst => system_reset,
-    pc0 => decoder_pc0,
-    pc1 => decoder_pc1,
-    pc2 => decoder_pc2,
-    pc3 => decoder_pc3,
-    pc4 => decoder_pc4,
-    pc5 => decoder_pc5,
-    pc6 => decoder_pc6,
-    pc7 => decoder_pc7,
-    pc_ready => decoder_valid,
-    pc_ack => decoder_ack,
-    
-    prog_ok => enable_programming,
-    prog_addr => reg.prog_reg_addr(5 downto 0),
-    prog_we => reg.prog_decoder_memory_we(0),
-    prog_data => reg.prog_reg_data(11 downto 0),
-    
-    dv0_addr => dv_wr0_addr(0),
-    dv0_we => dv_wr0_we(0),
-    dv0_data => dv_wr0_data(0),
-    dv1_addr => open,
-    dv1_we => open,
-    dv1_data => open,
-    dv2_addr => open,
-    dv2_we => open,
-    dv2_data => open,
-    dv3_addr => open,
-    dv3_we => open,
-    dv3_data => open,
-    timestep => timestep,
-    all_done => decoder_bottom_half_all_done
-);
-all_decoders_done <= decoder_bottom_half_all_done; -- correct for one PC
+all_decoders_done <= all_done(0); -- correct for one PC
 
 end architecture rtl;
