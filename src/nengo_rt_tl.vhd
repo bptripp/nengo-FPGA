@@ -418,7 +418,7 @@ INPUT_SWAP_BANKS: for I in 8 to NUMBER_OF_DV_BANKS-1 generate
     LOCK: bank_lock port map (
         clk => clk_125,
         rst => system_reset,
-        en => page_en(I-1),
+        en => page_en(I-8), -- FIXME was (I-1), but (I-8) seems correct as only page_wr_en(0) and therefore page_en(0) actually used (by input bank 192)
         lock => page_lock,
         timestep => timestep,
         swap_banks => swap_banks(I)
