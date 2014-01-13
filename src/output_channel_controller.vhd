@@ -11,6 +11,7 @@ entity output_channel_controller is port (
 -- The instruction format for this controller is:
 -- |L|P|DDDDDDDD|AAAAAAAAAAA|NNNNNNNNNNN|TTTT|
   insn_data: in std_logic_vector(35 downto 0);
+  no_insns: in std_logic;
   dv_addr: out std_logic_vector(18 downto 0);
   dv_port: out std_logic;
   dv_data: in std_logic_vector(11 downto 0);
@@ -58,7 +59,7 @@ architecture rtl of output_channel_controller is
     dv_port => '0',
     channel_data => X"000",
     channel_we => '0',
-    done => '0',
+    done => '1',
     -- state variables
     state => state_idle,
 	 stalled => '0',
@@ -88,7 +89,7 @@ begin
 	channel_we <= reg.channel_we;
 	done <= reg.done;
   
-  COMB: process(reg, rst, start, insn_data, dv_data)
+  COMB: process(reg, rst, start, insn_data, no_insns, dv_data)
     variable ci: ci_type;
   begin
     ci := reg;
@@ -103,20 +104,29 @@ begin
     else
       case reg.state is
         when state_idle =>
-          if(start = '1') then
-				ci.state := state_delay;
-				ci.dt := unsigned(insn_data(3 downto 0));
-				ci.done := '0';
-				-- flush pipeline
-				ci.last_s1 := '0';
-				ci.last_s2 := '0';
-				ci.last_s3 := '0';
-				ci.valid_s1 := '0';
-				ci.valid_s2 := '0';
-				ci.valid_s3 := '0';
-				
-				ci.last := '0';
-				ci.valid := '0';
+		    if(no_insns = '1') then
+				-- finish immediately if the channel is unused; assert done for one clock cycle
+				if(start = '1') then
+					ci.done := '1';
+				else
+					ci.done := '0';
+				end if;
+			 else
+				 if(start = '1') then
+					ci.state := state_delay;
+					ci.dt := unsigned(insn_data(3 downto 0));
+					ci.done := '0';
+					-- flush pipeline
+					ci.last_s1 := '0';
+					ci.last_s2 := '0';
+					ci.last_s3 := '0';
+					ci.valid_s1 := '0';
+					ci.valid_s2 := '0';
+					ci.valid_s3 := '0';
+					
+					ci.last := '0';
+					ci.valid := '0';
+				 end if;
 			 end if;
 		  when state_delay =>
 			 -- if we've been here before...

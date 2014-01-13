@@ -27,6 +27,7 @@ architecture rtl of output_channel is
     start: in std_logic;
     next_insn: out std_logic;
     insn_data: in std_logic_vector(35 downto 0);
+	 no_insns: in std_logic;
     dv_addr: out std_logic_vector(18 downto 0);
     dv_port: out std_logic;
     dv_data: in std_logic_vector(11 downto 0);
@@ -50,6 +51,7 @@ architecture rtl of output_channel is
   
   signal insn: std_logic_vector(35 downto 0);
   signal next_insn: std_logic;
+  signal no_insns: std_logic;
   
   signal buffer_din: std_logic_vector(35 downto 0);
   signal buffer_we: std_logic;
@@ -63,6 +65,7 @@ CONTROLLER: output_channel_controller port map (
 	start => start,
 	next_insn => next_insn,
 	insn_data => insn,
+	no_insns => no_insns,
 	dv_addr => dv_addr,
 	dv_port => dv_port,
 	dv_data => dv_data,
@@ -81,7 +84,7 @@ INSN_BUF: output_instruction_buffer port map (
 	
 	dout => insn,
 	rd_en => next_insn,
-	empty => open
+	empty => no_insns
 );
 
 -- mux programming input with feedback
