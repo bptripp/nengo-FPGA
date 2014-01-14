@@ -9,6 +9,7 @@ entity population_unit_1d is port (
 	clk: in std_logic;
 	rst: in std_logic;
 	timestep: in std_logic;
+	encoder_done: out std_logic; -- from encoder pipeline controller
 	all_done: out std_logic; -- from decoder bottom half
 	
 	-- encoder 0 connection to DV interconnect
@@ -59,9 +60,11 @@ component encoder_pipeline_controller     generic (
         timestep: in std_logic;
         fifo_full: in std_logic_vector(N-1 downto 0);
         
-        encode_next: out std_logic
+        encode_next: out std_logic;
+		  timestep_complete: out std_logic
     ); end component;
 signal encoder_next_population: std_logic;
+signal encoder_timestep_complete: std_logic;
 
 component encoder_unit port (
     clk: in std_logic;
@@ -246,8 +249,10 @@ ENCODER_PIPE_CTRL: encoder_pipeline_controller generic map (N=>1) port map (
 	encoder_done(0) => encoder0_done,
 	timestep => timestep,
 	fifo_full(0) => encoder0_fifo_almost_full,
-	encode_next => encoder_next_population
+	encode_next => encoder_next_population,
+	timestep_complete => encoder_timestep_complete
 );
+encoder_done <= encoder_timestep_complete;
 
 FILTER0: first_order_filter_unit port map (
 	clk => clk,

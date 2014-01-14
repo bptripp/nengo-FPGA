@@ -247,6 +247,7 @@ component population_unit_1d port (
 	clk: in std_logic;
 	rst: in std_logic;
 	timestep: in std_logic;
+	encoder_done: out std_logic;
 	all_done: out std_logic; -- from decoder bottom half
 	
 	-- encoder 0 connection to DV interconnect
@@ -285,6 +286,8 @@ component population_unit_1d port (
 	prog_decoder_memory_we: in std_logic	
 ); end component population_unit_1d;
 constant NUMBER_OF_POPULATION_UNITS: integer := 8;
+signal encoder_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0);
+signal all_encoders_done: std_logic;
 signal all_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0);
 
 begin
@@ -503,6 +506,7 @@ POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
 		clk => clk_125,
 		rst => system_reset,
 		timestep => timestep,
+		encoder_done => encoder_done(I),
 		all_done => all_done(I),
 		
 		encoder0_dv_addr => encoder_addr(I)(18 downto 0),
@@ -547,6 +551,7 @@ POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
 	);
 end generate POPULATION_UNITS;
 
+all_encoders_done <= and_reduce(encoder_done);
 all_decoders_done <= and_reduce(all_done);
 
 end architecture rtl;
