@@ -22,7 +22,7 @@ entity nengo_rt_tl is generic (
     -- 0x3: PC LFSRs
     -- 0x4: Principal Component sample space
     -- 0x5: Decoder memory (circular buffers)
-    -- 0x6: not used
+    -- 0x6: Output channel instruction lists
     -- 0x7: not used
     -- Addressing LSBs vary by target:
     -- Decoded Value buffers use 19: the highest 8 address an individual DV buffer,
@@ -38,6 +38,7 @@ entity nengo_rt_tl is generic (
     -- Decoder memory uses 13: the 7 highest address a population unit,
     -- the next 2 choose which of the 4 DVs is being decoded, 
     -- and the lowest 4 address one of the 16 DV decoder circular buffers.
+	 -- Output channel instruction lists use 7, which directly address one of 128 (maximum) output channels.
     prog_addr: in std_logic_vector(23 downto 0); 
     prog_we: in std_logic; -- active HIGH pulse; ignored while prog_ok is LOW.
     -- Again, the important bits in this field vary depending on what's being programmed:
@@ -47,6 +48,7 @@ entity nengo_rt_tl is generic (
     -- PC LFSRs use the lowest 32.
     -- Principal components use the lowest 12.
     -- Decoder memory uses the lowest 12.
+	 -- Output channel instruction lists use the lowest 36.
     prog_data: in std_logic_vector(39 downto 0);
     prog_ack: out std_logic;
     prog_nyet: out std_logic;
@@ -114,6 +116,7 @@ type ci_type is record
     prog_pc_lfsr_we: std_logic_vector(127 downto 0);
     prog_pc_we: std_logic_vector(127 downto 0);
     prog_decoder_memory_we: std_logic_vector(127 downto 0);
+	 prog_output_channel_we: std_logic_vector(127 downto 0);
     -- registered programming address and data
     prog_reg_addr: std_logic_vector(20 downto 0); -- 3 MSBs already decoded into prog_*_we
     prog_reg_data: std_logic_vector(39 downto 0);    
@@ -130,6 +133,7 @@ constant reg_reset: ci_type := (
     prog_pc_lfsr_we => (others=>'0'),
     prog_pc_we => (others=>'0'),
     prog_decoder_memory_we => (others=>'0'),
+	 prog_output_channel_we => (others=>'0'),
     prog_reg_addr => (others=>'0'),
     prog_reg_data => (others=>'0'),
     resp_ack => '0',
@@ -155,6 +159,7 @@ port (
     timestep_overflow: out std_logic
 ); end component;
 signal all_decoders_done: std_logic;
+signal timestep_done: std_logic; -- decoders done and outputs done
 signal timestep: std_logic; attribute mark_debug of timestep: signal is "true";
 signal timestep_overflow_stb: std_logic;
 
@@ -243,12 +248,56 @@ signal encoder_select: encoder_selection_type; -- the idea is that encoder_selec
 type reverse_encoder_selection_type is array(0 to NUMBER_OF_ENCODERS-1) of std_logic_vector(2*NUMBER_OF_DV_BANKS-1 downto 0);
 signal reverse_encoder_select: reverse_encoder_selection_type; -- effectively, reverse_encoder_select(X) is the concatenation of encoder_select(*)(X)
 
+constant NUMBER_OF_OUTPUT_CHANNELS: integer := 1; -- must be less than or equal to NUMBER_OF_ENCODERS
+-- addresses provided from output channel
+signal output_channel_dv_addr: encoder_addresses(0 to NUMBER_OF_OUTPUT_CHANNELS-1);
+-- duplicates encoder data
+signal output_channel_dv_data: dv_data(0 to NUMBER_OF_OUTPUT_CHANNELS-1);
+-- encoder_addr_to_mux is the signal that actually connects to each mux_to_dv_port component;
+-- the first (NUMBER_OF_OUTPUT_CHANNELS) of these are pre-muxed between encoder_addr and output_channel_addr,
+-- and the remaining ones are wired directly to encoder_addr
+signal encoder_addr_to_mux: encoder_addresses(0 to NUMBER_OF_ENCODERS-1);
+
+component output_channel port (
+  clk: in std_logic;
+  rst: in std_logic;
+  
+  start: in std_logic;
+  dv_addr: out std_logic_vector(18 downto 0);
+  dv_port: out std_logic;
+  dv_data: in std_logic_vector(11 downto 0);
+  channel_data: out std_logic_vector(11 downto 0);
+  channel_we: out std_logic;
+  done: out std_logic;
+
+  prog_ok: in std_logic;
+  prog_we: in std_logic;
+  prog_data: in std_logic_vector(35 downto 0)
+); end component;
+-- actual data/we path leaving output channel
+signal output_channel_data: dv_data(0 to NUMBER_OF_OUTPUT_CHANNELS-1);
+signal output_channel_we: std_logic_vector(NUMBER_OF_OUTPUT_CHANNELS-1 downto 0);
+
+signal output_done: std_logic_vector(NUMBER_OF_OUTPUT_CHANNELS-1 downto 0);
+signal all_outputs_done: std_logic;
+
+component encoder_output_coordinator port (
+  clk: in std_logic;
+  rst: in std_logic;
+  all_encoders_done: in std_logic;
+  all_outputs_done: in std_logic;
+  mux_select: out std_logic;            -- 0 selects encoders, 1 selects outputs
+  output_start: out std_logic           -- strobed for 1 cycle to signal outputs                                      
+); end component;
+signal encoder_output_mux_select: std_logic;
+signal output_start: std_logic;
+
 component population_unit_1d port (
 	clk: in std_logic;
 	rst: in std_logic;
 	timestep: in std_logic;
 	encoder_done: out std_logic;
-	all_done: out std_logic; -- from decoder bottom half
+	all_done: out std_logic; -- from decoder bottom half.
 	
 	-- encoder 0 connection to DV interconnect
 	encoder0_dv_addr: out std_logic_vector(18 downto 0);
@@ -288,7 +337,7 @@ component population_unit_1d port (
 constant NUMBER_OF_POPULATION_UNITS: integer := 8;
 signal encoder_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0);
 signal all_encoders_done: std_logic;
-signal all_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0);
+signal all_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0); -- FIXME this should be renamed something like "decoder_done" or "population_done"
 
 begin
 
@@ -317,6 +366,7 @@ COMB: process(reg, system_reset, prog_addr, prog_we, prog_data, enable_programmi
     variable pc_lfsr_index: unsigned(6 downto 0);
     variable pc_index: unsigned(6 downto 0);
     variable decoder_index: unsigned(6 downto 0);
+	 variable output_channel_index: unsigned(6 downto 0);
 
 begin
     ci := reg;
@@ -327,6 +377,7 @@ begin
     ci.prog_pc_lfsr_we := (others=>'0');
     ci.prog_pc_we := (others=>'0');
     ci.prog_decoder_memory_we := (others=>'0');
+	 ci.prog_output_channel_we := (others=>'0');
     ci.resp_ack := '0';
     ci.resp_nyet := '0';
     ci.resp_error := '0';
@@ -340,6 +391,7 @@ begin
     pc_lfsr_index := unsigned(prog_addr_sub(8 downto 2));
     pc_index := unsigned(prog_addr_sub(20 downto 14));
     decoder_index := unsigned(prog_addr_sub(12 downto 6));
+	 output_channel_index := unsigned(prog_addr_sub(6 downto 0));
     
     if(system_reset = '1') then
         ci := reg_reset;
@@ -368,6 +420,9 @@ begin
                     when "101" => -- decoder memory      
                         ci.prog_decoder_memory_we(to_integer(decoder_index)) := '1';
                         ci.resp_ack := '1';
+						  when "110" => -- output channel
+						      ci.prog_output_channel_we(to_integer(output_channel_index)) := '1';
+							   ci.resp_ack := '1';
                     when others =>
                         ci.resp_error := '1';
                 end case;
@@ -397,12 +452,14 @@ SEQUENCER: timestep_sequencer generic map (
     rst => system_reset,
     start => start,
     pause => pause,
-    done => all_decoders_done,
+    done => timestep_done,
     
     running => run_started,
     timestep => timestep,
     timestep_overflow => timestep_overflow_stb
 );
+
+timestep_done <= all_decoders_done and all_outputs_done;
 
 -- FIXME BLATANT CHEATING to stop XST from optimizing most of the design out
 timestep_overflow <= timestep_overflow_stb or dv_rd0_data(0)(0) or dv_rd0_data(0)(1) or dv_rd0_data(0)(2) or dv_rd0_data(0)(3)
@@ -459,7 +516,7 @@ DV_BANKS: for I in 0 to 7 generate
 		 decode => "0" & std_logic_vector(to_unsigned(I, 8))
 	) port map (
 		 clk => clk_125,
-		 data => encoder_addr,
+		 data => encoder_addr_to_mux,
 		 output => dv_rd0_addr(I),
 		 selected => encoder_select(I)
 	);
@@ -489,7 +546,7 @@ MUX_TO_DV192_PORT0: mux_to_dv_port generic map (
     decode => "0" & X"C0"
 ) port map (
     clk => clk_125,
-    data => encoder_addr,
+    data => encoder_addr_to_mux,
     output => dv_rd0_addr(8),
     selected => encoder_select(8)
 );
@@ -553,5 +610,46 @@ end generate POPULATION_UNITS;
 
 all_encoders_done <= and_reduce(encoder_done);
 all_decoders_done <= and_reduce(all_done);
+
+OUTPUT_COORDINATOR: encoder_output_coordinator port map (
+	clk => clk_125,
+	rst => system_reset,
+	all_encoders_done => all_encoders_done,
+	all_outputs_done => all_outputs_done,
+	mux_select => encoder_output_mux_select,
+	output_start => output_start
+);
+all_outputs_done <= and_reduce(output_done);
+
+-- encoders that share an address line with an output channel are multiplexed
+ENCODER_ADDR_MUX: for I in 0 to NUMBER_OF_OUTPUT_CHANNELS-1 generate
+	encoder_addr_to_mux(I) <= output_channel_dv_addr(I) when encoder_output_mux_select = '1' else encoder_addr(I);
+end generate;
+-- encoders that don't share an address line with an output channel are passed through
+ENCODER_ADDR_PASSTHROUGH: for I in NUMBER_OF_OUTPUT_CHANNELS to NUMBER_OF_ENCODERS-1 generate
+	encoder_addr_to_mux(I) <= encoder_addr(I);
+end generate;
+
+OUTPUT_CHANNEL_DV_DATA_PASSTHROUGH: for I in 0 to NUMBER_OF_OUTPUT_CHANNELS-1 generate
+	output_channel_dv_data(I) <= encoder_data(I);
+end generate;
+
+OUTPUT_CHANNELS: for I in 0 to NUMBER_OF_OUTPUT_CHANNELS-1 generate
+	OUTCHAN: output_channel port map (
+		clk => clk_125,
+		rst => system_reset,
+		start => output_start, 
+		dv_addr => output_channel_dv_addr(I)(18 downto 0),
+		dv_port => output_channel_dv_addr(I)(19),
+		dv_data => output_channel_dv_data(I),
+		channel_data => output_channel_data(I),
+		channel_we => output_channel_we(I),
+		done => output_done(I),
+		
+		prog_ok => enable_programming,
+		prog_we => reg.prog_output_channel_we(I),
+		prog_data => reg.prog_reg_data(35 downto 0)
+	);
+end generate;
 
 end architecture rtl;

@@ -105,11 +105,11 @@ begin
       case reg.state is
         when state_idle =>
 		    if(no_insns = '1') then
-				-- finish immediately if the channel is unused; assert done for one clock cycle
+				-- finish immediately if the channel is unused; toggle done
 				if(start = '1') then
-					ci.done := '1';
-				else
 					ci.done := '0';
+				else
+					ci.done := '1';
 				end if;
 			 else
 				 if(start = '1') then

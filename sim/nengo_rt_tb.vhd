@@ -20,38 +20,8 @@ component nengo_rt_tl generic (
 ); port (
     clk_125: in std_logic;
     rst: in std_logic;    
-    -- 3 MSBs are target type:
-    -- 0x0: Decoded Value buffers
-    -- 0x1: Encoder instruction lists
-    -- 0x2: PC filter characteristics
-    -- 0x3: PC LFSRs
-    -- 0x4: Principal Component sample space
-    -- 0x5: Decoder memory (DDR3)
-    -- 0x6: not used
-    -- 0x7: not used
-    -- Addressing LSBs vary by target:
-    -- Decoded Value buffers use 19: the highest 8 address an individual DV buffer,
-    -- and the lowest 11 address within the buffer.
-    -- Encoder instruction lists use 9: the 7 highest address a population unit, and the lowest 2 address
-    -- one of (up to) four individual encoders.
-    -- PC filter characteristics use 11: the 7 highest address a population unit, the next 2 bits address
-    -- one of the four first-order filters,
-    -- and the lowest 2 bits address the A,B,C,D coefficients.
-    -- PC LFSRs use 9: the 7 highest address a population unit, and the lowest 2 bits address one of the four LFSRs.
-    -- Principal components use 21: the 7 highest address all PCs in one population unit, the next 4 address
-    -- an individual PC, and the lowest 10 address within the PC.
-    -- Decoder memory uses 13: the 7 highest address a population unit,
-    -- the next 2 choose which of the 4 DVs is being decoded, 
-    -- and the lowest 4 address one of the 16 DV decoder circular buffers.
     prog_addr: in std_logic_vector(23 downto 0); 
     prog_we: in std_logic; -- active HIGH pulse; ignored while prog_ok is LOW.
-    -- Again, the important bits in this field vary depending on what's being programmed:
-    -- Decoded value buffers use the lowest 12.
-    -- Encoder instruction lists use all 40.
-    -- PC filter characteristics use the lowest 12.
-    -- PC LFSRs use the lowest 32.
-    -- Principal components use the lowest 12.
-    -- Decoder memory uses the lowest 12.
     prog_data: in std_logic_vector(39 downto 0);
     prog_ack: out std_logic;
     prog_nyet: out std_logic;
@@ -380,6 +350,35 @@ begin
         prog_ack, prog_nyet, prog_error);  
 end procedure PROGRAM_DECODER;
 
+procedure PROGRAM_OUTPUT_CHANNEL
+(
+	which_channel: integer;
+	which_insn: std_logic_vector(35 downto 0);
+	
+	signal clk: in std_logic;
+   signal port_prog_addr: out std_logic_vector(23 downto 0);
+   signal port_prog_we: out std_logic;
+   signal port_prog_data: out std_logic_vector(39 downto 0);
+   signal prog_ack: in std_logic;
+   signal prog_nyet: in std_logic;
+   signal prog_error: in std_logic 
+) is
+	variable chan_u: unsigned(6 downto 0) := to_unsigned(which_channel, 7);
+	variable next_prog_addr: std_logic_vector(23 downto 0);
+	variable next_prog_data: std_logic_vector(39 downto 0);
+begin
+	next_prog_addr(23 downto 21) := "110";
+	next_prog_addr(20 downto 7) := (others=>'0');
+	next_prog_addr(6 downto 0) := std_logic_vector(chan_u);
+	next_prog_data(39 downto 36) := (others=>'0');
+	next_prog_data(35 downto 0) := which_insn;
+	
+    PROGRAM_WITH_HANDSHAKE(clk,
+        next_prog_addr, next_prog_data,
+        port_prog_addr, port_prog_we, port_prog_data,
+        prog_ack, prog_nyet, prog_error);  	
+end procedure PROGRAM_OUTPUT_CHANNEL;
+
 begin
 
 CLK125GEN: process
@@ -491,6 +490,7 @@ begin
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
     PROGRAM_PRINCIPAL_COMPONENT(0, 6, "integrator6.rom",
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+		  
     -- program DV#0 decoders 0 through 7
     -- FIXME technically we have to program 1024 decoders but they're all the same so this isn't wrong for now       
     PROGRAM_DECODER(0, 0, 0, to_slv(to_sfixed(0.16025, 1,-10)),
@@ -509,7 +509,12 @@ begin
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
     PROGRAM_DECODER(0, 0, 7, to_slv(to_sfixed(0.02, 1,-10)),
         clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-        
+
+	 -- program output channel #0
+	 -- read DV#0 port#0 addresses 0-1023 (feedback/output range), no delay
+	 PROGRAM_OUTPUT_CHANNEL(0, "1" & "0" & "00000000" & "00000000000" & "00111111111" & "0000",
+		clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+    
     -- begin simulation
     wait for CLOCK125_PERIOD*3;
     wait until falling_edge(clk_125);
