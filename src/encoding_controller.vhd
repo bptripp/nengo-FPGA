@@ -39,6 +39,7 @@ entity encoding_controller is
            rst : in STD_LOGIC;
            next_population: in std_logic;
            next_insn: out std_logic;
+			  no_insns: in std_logic;
            insn_data : in STD_LOGIC_VECTOR (39 downto 0);
            dv_addr : out STD_LOGIC_VECTOR (18 downto 0);
            dv_port : out STD_LOGIC;
@@ -109,7 +110,7 @@ begin
     sum <= reg.sum;
     done <= reg.done;
 
-    COMB: process(reg, rst, next_population, insn_data, dv_data)
+    COMB: process(reg, rst, next_population, no_insns, insn_data, dv_data)
         variable ci: ci_type;
         --variable dv: sfixed(1 downto -10);
     begin
@@ -164,43 +165,50 @@ begin
                         ci.last := '0';
                     end if;
                 when state_delay =>
-                    -- if we've been here before...
-                    if(reg.stalled = '1') then
-                        -- check delay register
-                        if(reg.dt = "0000000") then
-                            -- acknowledge
-                            ci.next_insn := '1';
-                            ci.stalled := '0';
-                            ci.state := state_execute;
-                            -- but here's where we actually use the instruction...
-                            --ci.dv_cs := '1';
-                            ci.dv_port := insn_data(31);
-                            ci.dv_addr := insn_data(30 downto 12);
-                            
-                            -- propagate weight and L
-                            ci.weight_s1 := to_sfixed(insn_data(11 downto 0), ci.weight_s1);
-                            ci.last_s1 := insn_data(39);
-                        else
-                            ci.dt := reg.dt - "0000001";
-                        end if;
-                    else
-                        -- read instruction and set delay register appropriately
-                        if(insn_data(38 downto 32) = "0000000") then
-                            ci.next_insn := '1';
-                            ci.state := state_execute;
-                            -- but here's where we actually use the instruction...
-                            --ci.dv_cs := '1';
-                            ci.dv_port := insn_data(31);
-                            ci.dv_addr := insn_data(30 downto 12);
-                            
-                            -- propagate weight and L
-                            ci.weight_s1 := to_sfixed(insn_data(11 downto 0), ci.weight_s1);
-                            ci.last_s1 := insn_data(39);
-                        else
-                            ci.dt := unsigned(insn_data(38 downto 32)) - "0000001";
-                            ci.stalled := '1';
-                        end if;
-                    end if;
+					     -- if there are no instructions to read, finish immediately and write 0.0
+						  if(no_insns = '1') then
+							  ci.state := state_idle;
+							  ci.sum := "000000000000";
+							  ci.done := '1';
+						  else
+							  -- if we've been here before...
+							  if(reg.stalled = '1') then
+									-- check delay register
+									if(reg.dt = "0000000") then
+										 -- acknowledge
+										 ci.next_insn := '1';
+										 ci.stalled := '0';
+										 ci.state := state_execute;
+										 -- but here's where we actually use the instruction...
+										 --ci.dv_cs := '1';
+										 ci.dv_port := insn_data(31);
+										 ci.dv_addr := insn_data(30 downto 12);
+										 
+										 -- propagate weight and L
+										 ci.weight_s1 := to_sfixed(insn_data(11 downto 0), ci.weight_s1);
+										 ci.last_s1 := insn_data(39);
+									else
+										 ci.dt := reg.dt - "0000001";
+									end if;
+							  else
+									-- read instruction and set delay register appropriately
+									if(insn_data(38 downto 32) = "0000000") then
+										 ci.next_insn := '1';
+										 ci.state := state_execute;
+										 -- but here's where we actually use the instruction...
+										 --ci.dv_cs := '1';
+										 ci.dv_port := insn_data(31);
+										 ci.dv_addr := insn_data(30 downto 12);
+										 
+										 -- propagate weight and L
+										 ci.weight_s1 := to_sfixed(insn_data(11 downto 0), ci.weight_s1);
+										 ci.last_s1 := insn_data(39);
+									else
+										 ci.dt := unsigned(insn_data(38 downto 32)) - "0000001";
+										 ci.stalled := '1';
+									end if;
+							  end if;
+							end if;
                 when state_execute =>
                     -- if this is the last one, idle after this.
                     if(insn_data(39) = '1') then

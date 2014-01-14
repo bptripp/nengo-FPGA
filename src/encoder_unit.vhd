@@ -27,6 +27,7 @@ component encoding_controller Port (
     rst : in STD_LOGIC;
     next_population: in std_logic;
     next_insn: out std_logic;
+	 no_insns: in std_logic;
     insn_data : in STD_LOGIC_VECTOR (39 downto 0);
     dv_addr : out STD_LOGIC_VECTOR (18 downto 0);
     dv_port : out STD_LOGIC;
@@ -48,6 +49,7 @@ component instruction_buffer PORT (
 
 signal insn: std_logic_vector(39 downto 0);
 signal next_insn: std_logic;
+signal no_insns: std_logic;
 signal encoder_done: std_logic;
 signal last_done: std_logic := '0';
 
@@ -74,6 +76,7 @@ ENCODER: encoding_controller port map (
     rst => rst,
     next_population => next_population,
     next_insn => next_insn,
+	 no_insns => no_insns,
     insn_data => insn,
     dv_addr => dv_addr,
     dv_port => dv_port,
@@ -91,7 +94,7 @@ BUF: instruction_buffer port map (
     rd_en => next_insn,
     dout => insn,
     full => open,
-    empty => open
+    empty => no_insns
 );
 
 -- mux programming input with feedback
