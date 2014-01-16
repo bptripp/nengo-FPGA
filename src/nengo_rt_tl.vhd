@@ -63,7 +63,11 @@ entity nengo_rt_tl is generic (
     pause: in std_logic; -- Pulse HIGH to pause execution after current timestep. If start also asserted
                          -- on same timestep, single-step the simulation.
     running: out std_logic;
-    timestep_overflow: out std_logic -- Strobed HIGH when a timeout has occurred.
+    timestep_overflow: out std_logic; -- Strobed HIGH when a timeout has occurred.
+	 
+	 output0_data: out std_logic_vector(11 downto 0);
+	 output0_we: out std_logic;
+	 output0_done: out std_logic
     );
 end entity;
 
@@ -444,8 +448,8 @@ end process SEQ;
 
 
 SEQUENCER: timestep_sequencer generic map (
-    --SIMULATION => SIMULATION,
-    SIMULATION => "TRUE", -- FIXME CHEATING to get faster runs
+    SIMULATION => SIMULATION,
+    -- SIMULATION => "TRUE", -- CHEATING to get faster runs
     CLOCKS_PER_TIMESTEP => 125000
 ) port map (
     clk => clk_125,
@@ -651,5 +655,9 @@ OUTPUT_CHANNELS: for I in 0 to NUMBER_OF_OUTPUT_CHANNELS-1 generate
 		prog_data => reg.prog_reg_data(35 downto 0)
 	);
 end generate;
+
+output0_data <= output_channel_data(0);
+output0_we <= output_channel_we(0);
+output0_done <= output_done(0);
 
 end architecture rtl;

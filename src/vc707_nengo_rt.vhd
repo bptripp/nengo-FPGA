@@ -120,8 +120,8 @@ component sgmii_vc707_block generic
     signal sgmii_clk_r: std_logic;
     signal sgmii_clk_f: std_logic;
     signal sgmii_clk_en: std_logic;
-    signal gmii_txd: std_logic_vector(7 downto 0) := X"00"; -- FIXME transmit path disabled for now
-    signal gmii_tx_en: std_logic := '0';
+    signal gmii_txd: std_logic_vector(7 downto 0);
+    signal gmii_tx_en: std_logic;
     signal gmii_tx_er: std_logic := '0';
     signal gmii_rxd: std_logic_vector(7 downto 0);
     signal gmii_rx_dv: std_logic;
@@ -230,10 +230,76 @@ component nengo_rt_tl generic (
     pause: in std_logic; -- Pulse HIGH to pause execution after current timestep. If start also asserted
                          -- on same timestep, single-step the simulation.
     running: out std_logic;
-    timestep_overflow: out std_logic -- Strobed HIGH when a timeout has occurred.
+    timestep_overflow: out std_logic; -- Strobed HIGH when a timeout has occurred.
+	 output0_data: out std_logic_vector(11 downto 0);
+	 output0_we: out std_logic;
+	 output0_done: out std_logic
     ); end component nengo_rt_tl;
     signal sim_running: std_logic; 
     signal timestep_overflow: std_logic; 
+	 
+	 signal output0_data: std_logic_vector(11 downto 0);
+	 signal output0_we: std_logic;
+	 signal output0_done: std_logic;
+
+component output_channel_fifo port (
+	clk: in std_logic;
+  rst: in std_logic;
+  din: in std_logic_vector(11 downto 0);
+  wr_en: in std_logic;
+  rd_en: in std_logic;
+  dout: out std_logic_vector(11 downto 0);
+  full: out std_logic;
+  empty: out std_logic;
+  data_count: out std_logic_vector(10 downto 0);
+  prog_full: out std_logic
+); end component;
+
+component ethernet_tx_handler port (
+  clk: in std_logic;
+  rst: in std_logic;
+  station_mac: in std_logic_vector(47 downto 0);
+
+  -- channel side
+  ch_fifo_data: in std_logic_vector(11 downto 0);
+  ch_fifo_re: out std_logic;
+  ch_fifo_count: in std_logic_vector(10 downto 0);
+  ch_fifo_frame_ready: in std_logic;    -- programmable full flag = 512
+  ch_done: in std_logic;
+  -- TX FIFO side
+  tx_fifo_data: out std_logic_vector(7 downto 0);
+  tx_fifo_last: out std_logic;
+  tx_fifo_we: out std_logic;
+  tx_fifo_full: in std_logic
+); end component;
+
+signal ch_fifo_data: std_logic_vector(11 downto 0);
+signal ch_fifo_re: std_logic;
+signal ch_fifo_count: std_logic_vector(10 downto 0);
+signal ch_fifo_frame_ready: std_logic;
+
+signal tx_fifo_data: std_logic_vector(7 downto 0);
+signal tx_fifo_last: std_logic;
+signal tx_fifo_we: std_logic;
+signal tx_fifo_full: std_logic;
+signal tx_fifo_empty: std_logic;
+
+signal tx_chan_re: std_logic;
+signal tx_chan_data: std_logic_vector(7 downto 0);
+signal tx_chan_last: std_logic;
+signal tx_en: std_logic;
+
+component ethernet_tx_channel port (
+	clk: in std_logic;
+	rst: in std_logic;
+	data: in std_logic_vector(7 downto 0);
+	tx_en: in std_logic; -- to TX FIFO !empty
+	tx_last: in std_logic;
+	rd_en: out std_logic; -- to TX FIFO read enable
+	MAC_TD: out std_logic_vector(7 downto 0);
+	MAC_TX_EN: out std_logic;
+	MAC_TX_ERR: out std_logic
+); end component;
 
 begin
 
@@ -369,7 +435,65 @@ NENGO: nengo_rt_tl generic map (SIMULATION => "FALSE") port map (
     start => sim_start,
     pause => sim_pause,
     running => sim_running,
-    timestep_overflow => timestep_overflow
+    timestep_overflow => timestep_overflow,
+	 output0_data => output0_data,
+	 output0_we => output0_we,
+	 output0_done => output0_done
+);
+
+OUTPUT0_FIFO: output_channel_fifo port map (
+	clk => clk_125,
+	rst => system_reset,
+	din => output0_data,
+	wr_en => output0_we,
+	rd_en => ch_fifo_re,
+	dout => ch_fifo_data,
+	full => open,
+	empty => open,
+	data_count => ch_fifo_count,
+	prog_full => ch_fifo_frame_ready
+);
+
+TX_HANDLER: ethernet_tx_handler port map (
+	clk => clk_125,
+	rst => system_reset,
+	station_mac => station_mac,
+	ch_fifo_data => ch_fifo_data,
+	ch_fifo_re => ch_fifo_re,
+	ch_fifo_count => ch_fifo_count,
+	ch_fifo_frame_ready => ch_fifo_frame_ready,
+	ch_done => output0_done,
+	tx_fifo_data => tx_fifo_data,
+	tx_fifo_last => tx_fifo_last,
+	tx_fifo_we => tx_fifo_we,
+	tx_fifo_full => tx_fifo_full
+);
+
+TX_FIFO: ethernet_rx_fifo port map (
+	rst => system_reset,
+	wr_clk => clk_125,
+	rd_clk => userclk2,
+	din(8) => tx_fifo_last,
+	din(7 downto 0) => tx_fifo_data,
+	wr_en => tx_fifo_we,
+	rd_en => tx_chan_re,
+	dout(8) => tx_chan_last,
+	dout(7 downto 0) => tx_chan_data,
+	full => tx_fifo_full,
+	empty => tx_fifo_empty
+);
+tx_en <= not tx_fifo_empty;
+
+TX_CHANNEL: ethernet_tx_channel port map (
+	clk => userclk2, -- FIXME clock enable
+	rst => RST,
+	data => tx_chan_data,
+	tx_en => tx_en,
+	tx_last => tx_chan_last,
+	rd_en => tx_chan_re,
+	MAC_TD => gmii_txd,
+	MAC_TX_EN => gmii_tx_en,
+	MAC_TX_ERR => gmii_tx_er
 );
 
 GPIO_LED(0) <= prog_ok;

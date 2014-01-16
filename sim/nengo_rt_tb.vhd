@@ -36,7 +36,11 @@ component nengo_rt_tl generic (
     pause: in std_logic; -- Pulse HIGH to pause execution after current timestep. If start also asserted
                          -- on same timestep, single-step the simulation.
     running: out std_logic;
-    timestep_overflow: out std_logic -- Strobed HIGH when a timeout has occurred.
+    timestep_overflow: out std_logic; -- Strobed HIGH when a timeout has occurred.
+	 
+	 output0_data: out std_logic_vector(11 downto 0);
+	 output0_we: out std_logic;
+	 output0_done: out std_logic
     ); end component;
 
 signal rst: std_logic;
@@ -56,6 +60,9 @@ signal start: std_logic;
 signal pause: std_logic;
 signal running: std_logic;
 signal timestep_overflow: std_logic;
+signal output0_data: std_logic_vector(11 downto 0);
+signal output0_we: std_logic;
+signal output0_done: std_logic;
 
   function to_string(sv: Std_Logic_Vector) return string is
     variable bv: bit_vector(sv'range) := to_bitvector(sv);
@@ -410,7 +417,10 @@ uut: nengo_rt_tl generic map ( SIMULATION => "TRUE") port map (
     start => start,
     pause => pause,
     running => running,
-    timestep_overflow => timestep_overflow
+    timestep_overflow => timestep_overflow,
+	 output0_data => output0_data,
+	 output0_we => output0_we,
+	 output0_done => output0_done
 );
 
 tb: process

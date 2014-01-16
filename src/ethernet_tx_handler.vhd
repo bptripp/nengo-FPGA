@@ -63,6 +63,8 @@ tx_fifo_data <= reg.tx_fifo_data;
 tx_fifo_last <= reg.tx_fifo_last;
 tx_fifo_we <= reg.tx_fifo_we;
 
+-- FIXME we do not stall when tx_fifo_full is asserted, but we should!
+
   COMB: process(reg, rst, ch_fifo_data, ch_fifo_count, ch_fifo_frame_ready, ch_done, tx_fifo_full)
     variable ci: ci_type;
 	 variable ch_fifo_count_u: unsigned(10 downto 0);
