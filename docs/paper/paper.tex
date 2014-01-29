@@ -151,22 +151,40 @@ without requiring physical access to the hardware.
 
 \subsection{Constraints on models}
 
+\begin{itemize}
+\item encoder instruction buffer size limits number of decoded values that can be encoded
+\item dimensional restrictions -- 1D, 2D population units
+\item four decoded values per population -- using more will create copies of populations to accommodate extra decoders
+\end{itemize}
+
 \subsection{Implementation details}
 
-\subsubsection{VC707}
-
-\subsubsection{Ethernet}
+\begin{itemize}
+\item VC707 board
+\item resources available -- BRAM, DSP
+\item implemented design -- number of population units, DV buffers
+\item FPGA resources utilized; maximum theoretical design size
+\item clock speed and implications of this
+\item Ethernet communication for control and I/O -- maximum channel capacity in terms of DVs
+\end{itemize}
 
 \subsection{Nengo backend}
 
-% quick description of what that involves
+\begin{itemize}
+\item quick description of Nengo
+\item Nengo ensembles are hardware populations
+\item Nengo connections are hardware encoders and decoders
+\item Nengo nodes and probes are hardware I/O endpoints
+\item compiler functions: calculate principal components, map populations to PCs, calculate decoders and encoders,
+calculate encoder schedule, create programming file
+\item Nengo will then program the board and communicate with it during simulation
+\end{itemize}
 
 \section{Results}
 
 \subsection{basic simulation}
 
 \subsection{elaborate simulations}
-
 
 \subsection{power, \% timestep used for each simulation, \% of board resources for each simulation}
 
@@ -175,7 +193,13 @@ without requiring physical access to the hardware.
 \subsection{How well it worked}
 
 \subsection{Limitations}
+
 \subsection{Future work \& extensions}
 
+\begin{itemize}
+\item board-to-board communication for larger networks
+\item increase design size by using off-chip memory (DDR3)
+\item better network stack to allow control and I/O over common protocols e.g. UDP
+\end{itemize}
 
 \end{document}
