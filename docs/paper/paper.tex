@@ -52,7 +52,7 @@ However, because the decoded value buffers have a fixed number of access ports f
 a maximum of two encoder units are allowed to access a single decoded value buffer simultaneously
 without causing a bus collision.
 
-Each encoder unit is attached to a circular buffer of size 8192
+Each encoder unit is attached to a circular buffer of size 8192 % FIXME check the size
 containing a list of instructions for calculating one encoded value. 
 This size was chosen as a compromise between memory utilization and encoder flexibility.
 Each instruction corresponds to delaying for one or more clock cycles
@@ -153,8 +153,28 @@ without requiring physical access to the hardware.
 
 \begin{itemize}
 \item encoder instruction buffer size limits number of decoded values that can be encoded
+
+There is an artificial limitation on the complexity of the encoding operation due to the length of the instruction buffer that is used.
+With a size of 8192, % FIXME check size
+because each encoder must produce 1024 encoded values per timestep, a maximum of eight instructions, and therefore eight decoded values
+(not necessarily distinct)
+can be used in encoding. It is theoretically possible to implement an encoding operation that requires more decoded values to be used,
+but the extra instructions used for this mean that other populations sharing that encoder will have to use fewer.
+It is expected that the compiler will be able to detect this scenario and reorganize populations appropriately so as to avoid overfilling the instruction buffers.
 \item dimensional restrictions -- 1D, 2D population units
+% FIXME citation about why 2D is ``good enough''
+
+As only one-dimensional and two-dimensional population units have been implemented, networks that require populations to compute functions
+of three or more independent variables cannot be simulated with this design.
 \item four decoded values per population -- using more will create copies of populations to accommodate extra decoders
+
+The choice of using a maximum of four sets of decoder vectors per population is arbitrary; it seems to be a good balance between
+population connectivity and memory usage. However, populations that have more than four outgoing connections must be treated specially.
+Assuming none of the outgoing connections can be combined together (for example, if the function they decode only differs by a constant),
+in order to implement such a population on the simulator, it is necessary to duplicate it and simulate it twice,
+once with the first four decoder vectors and again with the remaining ones. The consequence of this is that a population with more than
+four outgoing connections will be represented as two or more populations in simulation, thereby reducing the actual number of
+distinct populations that can be simulated.
 \end{itemize}
 
 \subsection{Implementation details}
