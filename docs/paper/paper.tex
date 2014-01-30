@@ -218,8 +218,19 @@ calculate encoder schedule, create programming file
 
 \begin{itemize}
 \item board-to-board communication for larger networks
+
+The flexibility of input and output channels lends to their use in connecting multiple devices together for use as part of a larger simulation engine.
+This would allow networks to be simulated that consume more resources than are available on a single device, which may in turn allow
+for ``grids'' of inexpensive hardware devices to be used to simulate a very large model.
 \item increase design size by using off-chip memory (DDR3)
 \item better network stack to allow control and I/O over common protocols e.g. UDP
+
+The current control and I/O interface communicates over Ethernet, but since bare frames are being used with no higher-level protocols on top of them,
+it is somewhat cumbersome to set up a computer or other device to send and receive data to the hardware.
+This approach is suitable for testing and prototyping, but it makes certain assumptions about the setup of the network and the host computer that
+may not be reasonable for general use, such as requiring raw socket privileges on the host operating system (which typically require administrator access).
+A more user-friendly approach would be to implement an Ethernet stack that supports a protocol such as UDP, which can be readily used by many different
+kinds of host software in order to interact with a simulation.
 \end{itemize}
 
 \end{document}
