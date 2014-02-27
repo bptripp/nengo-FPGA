@@ -386,6 +386,50 @@ begin
         prog_ack, prog_nyet, prog_error);  	
 end procedure PROGRAM_OUTPUT_CHANNEL;
 
+
+function string_to_std_logic(c: character) return std_logic is 
+    variable sl: std_logic;
+    begin
+      case c is
+        when 'U' => 
+           sl := 'U'; 
+        when 'X' =>
+           sl := 'X';
+        when '0' => 
+           sl := '0';
+        when '1' => 
+           sl := '1';
+        when 'Z' => 
+           sl := 'Z';
+        when 'W' => 
+           sl := 'W';
+        when 'L' => 
+           sl := 'L';
+        when 'H' => 
+           sl := 'H';
+        when '-' => 
+           sl := '-';
+        when others =>
+           sl := 'X'; 
+    end case;
+   return sl;
+  end string_to_std_logic;
+
+function string_to_std_logic_vector(s: string) return std_logic_vector is 
+  variable slv: std_logic_vector(s'high-s'low downto 0);
+  variable k: integer;
+begin
+   k := s'high-s'low;
+  for i in s'range loop
+     slv(k) := string_to_std_logic(s(i));
+     k      := k - 1;
+  end loop;
+  return slv;
+end string_to_std_logic_vector;                                       
+                             
+
+file loadfile: TEXT open read_mode is "nengo_rt_tb.nengo-rt";
+
 begin
 
 CLK125GEN: process
@@ -426,6 +470,12 @@ uut: nengo_rt_tl generic map ( SIMULATION => "TRUE") port map (
 tb: process
     variable tmp_dv_data: std_logic_vector(11 downto 0);
     variable addr_counter: unsigned(9 downto 0);
+	 
+	 variable next_prog_addr: std_logic_vector(23 downto 0);
+    variable next_prog_data: std_logic_vector(39 downto 0);
+	 
+	 variable l: line;
+	 variable s: string(1 to 65);	 
 begin
     rst <= '1';
     prog_addr <= (others=>'0');
@@ -443,6 +493,18 @@ begin
     rst <= '0';
     wait until prog_ok = '1';
     
+	 -- program the board from the specified Nengo-RT loadfile
+	 while not endfile(loadfile) loop
+		readline(loadfile, l);
+		read(l, s);
+		next_prog_addr := string_to_std_logic_vector(s(1 to 24));
+		next_prog_data := string_to_std_logic_vector(s(26 to 65));
+		PROGRAM_WITH_HANDSHAKE( clk_125,
+			next_prog_addr, next_prog_data,
+			prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error
+		);
+	 end loop;
+	 
     -- six things to program:
     -- "000" - Decoded Value buffers (just to clear them)
     -- "001" - Encoder instruction lists
@@ -452,79 +514,79 @@ begin
     -- "101" - Decoder memory circular buffers
     
     -- program DV#0: addresses 0 to 1023 get X"000" (feedback/output range)
-    for I in 0 to 1023 loop 
-        tmp_dv_data := X"000";
-        PROGRAM_DV_BUFFER(0, I, tmp_dv_data,
-            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    end loop;
-    -- program DV#192: addresses 0 to 1023 get to_sfixed(0.5, 1,-10) (input range)
-    for I in 0 to 1023 loop
-        tmp_dv_data := to_slv(to_sfixed(0.5, 1,-10));                
-        PROGRAM_DV_BUFFER(192, I, tmp_dv_data,
-            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    end loop;
-    
-    -- program encoder#0: 1.0*Xi + 0.1*Ui
-    for I in 0 to 1023 loop
-        addr_counter := to_unsigned(I, 10);
-        PROGRAM_ENCODER(0, 0,
-            "0" & "0000000" & "0" & "00000000" & "0" & std_logic_vector(addr_counter) & to_slv(to_sfixed(1.0, 1,-10)),
-            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-        PROGRAM_ENCODER(0, 0,
-            "1" & "0000000" & "0" & "11000000" & "0" & std_logic_vector(addr_counter) & to_slv(to_sfixed(0.1, 1,-10)),
-            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    end loop;
-    
-    -- program filter#0: A=0.99005, B=0.00995, C=0.99005, D=0.00995
-    PROGRAM_FILTER(0, 0,
-        to_slv(to_sfixed(0.99005, 1,-10)), to_slv(to_sfixed(0.00995, 1,-10)),         
-        to_slv(to_sfixed(0.99005, 1,-10)), to_slv(to_sfixed(0.00995, 1,-10)),         
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-        
-    -- program LFSR
-    PROGRAM_LFSR(0, X"DD77F900", X"0CA6B31D", X"20A15FD0", X"A316C1EF",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    
-    -- program principal components 0 through 6
-    PROGRAM_PRINCIPAL_COMPONENT(0, 0, "integrator0.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_PRINCIPAL_COMPONENT(0, 1, "integrator1.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_PRINCIPAL_COMPONENT(0, 2, "integrator2.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_PRINCIPAL_COMPONENT(0, 3, "integrator3.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_PRINCIPAL_COMPONENT(0, 4, "integrator4.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_PRINCIPAL_COMPONENT(0, 5, "integrator5.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_PRINCIPAL_COMPONENT(0, 6, "integrator6.rom",
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-		  
-    -- program DV#0 decoders 0 through 7
-    -- FIXME technically we have to program 1024 decoders but they're all the same so this isn't wrong for now       
-    PROGRAM_DECODER(0, 0, 0, to_slv(to_sfixed(0.16025, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 1, to_slv(to_sfixed(-1.87415, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 2, to_slv(to_sfixed(0.01965, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 3, to_slv(to_sfixed(-0.06815, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 4, to_slv(to_sfixed(-0.0181, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 5, to_slv(to_sfixed(-0.02425, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 6, to_slv(to_sfixed(-0.00245, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    PROGRAM_DECODER(0, 0, 7, to_slv(to_sfixed(0.02, 1,-10)),
-        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-
-	 -- program output channel #0
-	 -- read DV#0 port#0 addresses 0-1023 (feedback/output range), no delay
-	 PROGRAM_OUTPUT_CHANNEL(0, "1" & "0" & "00000000" & "00000000000" & "00111111111" & "0000",
-		clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
-    
+    --for I in 0 to 1023 loop 
+    --    tmp_dv_data := X"000";
+--        PROGRAM_DV_BUFFER(0, I, tmp_dv_data,
+--            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    end loop;
+--    -- program DV#192: addresses 0 to 1023 get to_sfixed(0.5, 1,-10) (input range)
+--    for I in 0 to 1023 loop
+--        tmp_dv_data := to_slv(to_sfixed(0.5, 1,-10));                
+--        PROGRAM_DV_BUFFER(192, I, tmp_dv_data,
+--            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    end loop;
+--    
+--    -- program encoder#0: 1.0*Xi + 0.1*Ui
+--    for I in 0 to 1023 loop
+--        addr_counter := to_unsigned(I, 10);
+--        PROGRAM_ENCODER(0, 0,
+--            "0" & "0000000" & "0" & "00000000" & "0" & std_logic_vector(addr_counter) & to_slv(to_sfixed(1.0, 1,-10)),
+--            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--        PROGRAM_ENCODER(0, 0,
+--            "1" & "0000000" & "0" & "11000000" & "0" & std_logic_vector(addr_counter) & to_slv(to_sfixed(0.1, 1,-10)),
+--            clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    end loop;
+--    
+--    -- program filter#0: A=0.99005, B=0.00995, C=0.99005, D=0.00995
+--    PROGRAM_FILTER(0, 0,
+--        to_slv(to_sfixed(0.99005, 1,-10)), to_slv(to_sfixed(0.00995, 1,-10)),         
+--        to_slv(to_sfixed(0.99005, 1,-10)), to_slv(to_sfixed(0.00995, 1,-10)),         
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--        
+--    -- program LFSR
+--    PROGRAM_LFSR(0, X"DD77F900", X"0CA6B31D", X"20A15FD0", X"A316C1EF",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    
+--    -- program principal components 0 through 6
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 0, "integrator0.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 1, "integrator1.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 2, "integrator2.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 3, "integrator3.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 4, "integrator4.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 5, "integrator5.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_PRINCIPAL_COMPONENT(0, 6, "integrator6.rom",
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--		  
+--    -- program DV#0 decoders 0 through 7
+--    -- FIXME technically we have to program 1024 decoders but they're all the same so this isn't wrong for now       
+--    PROGRAM_DECODER(0, 0, 0, to_slv(to_sfixed(0.16025, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 1, to_slv(to_sfixed(-1.87415, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 2, to_slv(to_sfixed(0.01965, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 3, to_slv(to_sfixed(-0.06815, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 4, to_slv(to_sfixed(-0.0181, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 5, to_slv(to_sfixed(-0.02425, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 6, to_slv(to_sfixed(-0.00245, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--    PROGRAM_DECODER(0, 0, 7, to_slv(to_sfixed(0.02, 1,-10)),
+--        clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);
+--
+--	 -- program output channel #0
+--	 -- read DV#0 port#0 addresses 0-1023 (feedback/output range), no delay
+--	 PROGRAM_OUTPUT_CHANNEL(0, "1" & "0" & "00000000" & "00000000000" & "00111111111" & "0000",
+--		clk_125, prog_addr, prog_we, prog_data, prog_ack, prog_nyet, prog_error);   
+	 
     -- begin simulation
     wait for CLOCK125_PERIOD*3;
     wait until falling_edge(clk_125);

@@ -85,10 +85,15 @@ begin
 		prog_we <= '1';
 		
 		-- read 12 words from DV buffer 0 port 0, starting at address 4
-		prog_data <= "0" & "0" & "00000000" & "00000000100" & "00000001011" & "0000";		
-		wait for CLOCK_PERIOD;
+		--prog_data <= "0" & "0" & "00000000" & "00000000100" & "00000001011" & "0000";		
+		--wait for CLOCK_PERIOD;
 		-- read 8 words from DV buffer 2 port 1, starting at address 0 (delay for 3 extra cycles)
-		prog_data <= "1" & "1" & "00000010" & "00000000000" & "00000000111" & "0011";		
+		--prog_data <= "1" & "1" & "00000010" & "00000000000" & "00000000111" & "0011";		
+		--wait for CLOCK_PERIOD;
+		
+		prog_data <= "001100000000000000000000000000000000";
+		wait for CLOCK_PERIOD;
+		prog_data <= "100000000010000000000000000000000000";
 		wait for CLOCK_PERIOD;
 		
 		prog_we <= '0';

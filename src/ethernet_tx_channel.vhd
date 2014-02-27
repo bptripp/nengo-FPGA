@@ -179,7 +179,7 @@ CRC_FCS: CRC_gen PORT MAP (
           Reset => rst,
           Clk => clk,
           Init => crc_reset,
-          Frame_data => data,
+          Frame_data => ci_next.td,
           Data_en => crc_en,
           CRC_rd => crc_rd,
           CRC_end => open,

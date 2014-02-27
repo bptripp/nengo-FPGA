@@ -215,7 +215,7 @@ component dv_double_buffer port (
         prog_we: in std_logic;
         prog_data: in std_logic_vector(11 downto 0)
 ); end component;
-constant NUMBER_OF_DV_BANKS: integer := 9;
+constant NUMBER_OF_DV_BANKS: integer := 17;
 
 signal swap_banks: std_logic_vector(NUMBER_OF_DV_BANKS-1 downto 0);
 type dv_addr_type is array(0 to NUMBER_OF_DV_BANKS-1) of std_logic_vector(10 downto 0);
@@ -495,7 +495,7 @@ REVERSE_ENCODER_OUTER: for X in 0 to NUMBER_OF_ENCODERS-1 generate
     end generate;
 end generate;
 
-DV_BANKS: for I in 0 to 7 generate
+DV_BANKS: for I in 0 to 15 generate
 	DV_BANK: dv_double_buffer port map (
 		 clk => clk_125,
 		 rst => system_reset,
@@ -529,11 +529,11 @@ end generate DV_BANKS;
 INPUT_BANK192: dv_double_buffer port map (
     clk => clk_125,
     rst => system_reset,
-    swap_banks => swap_banks(8),
-    rd0_addr => dv_rd0_addr(8),
-    rd0_data => dv_rd0_data(8),
-    rd1_addr => dv_rd1_addr(8),
-    rd1_data => dv_rd1_data(8),
+    swap_banks => swap_banks(16),
+    rd0_addr => dv_rd0_addr(16),
+    rd0_data => dv_rd0_data(16),
+    rd1_addr => dv_rd1_addr(16),
+    rd1_data => dv_rd1_data(16),
     wr0_addr => page_word_addr,
     wr0_we => page_wr_en(0),
     wr0_data => page_data,
@@ -551,15 +551,15 @@ MUX_TO_DV192_PORT0: mux_to_dv_port generic map (
 ) port map (
     clk => clk_125,
     data => encoder_addr_to_mux,
-    output => dv_rd0_addr(8),
-    selected => encoder_select(8)
+    output => dv_rd0_addr(16),
+    selected => encoder_select(16)
 );
 
 -- FIXME the following generate blocks must be updated when more DV blocks are added
-encoder_select(9 to 17) <= (others=>(others=>'0'));
-FAKE_DV_RD1: for I in 0 to 8 generate
-	dv_rd1_addr(I) <= dv_rd0_addr(0);
-end generate;
+--encoder_select(9 to 17) <= (others=>(others=>'0'));
+--FAKE_DV_RD1: for I in 0 to 8 generate
+--	dv_rd1_addr(I) <= dv_rd0_addr(0);
+--end generate;
 
 
 POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
@@ -578,25 +578,24 @@ POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
 		encoder1_dv_port => open,
 		encoder1_dv_data => (others=>'0'),
 		
-		decoder0_dv_addr => dv_wr0_addr(I),
-		decoder0_dv_we => dv_wr0_we(I),
-		decoder0_dv_data => dv_wr0_data(I),
-		decoder1_dv_addr => dv_wr1_addr(I),
-		decoder1_dv_we => dv_wr1_we(I),
-		decoder1_dv_data => dv_wr1_data(I),
-		-- FIXME temporarily not using decoders #2 and #3
-		decoder2_dv_addr => open,
-		decoder2_dv_we => open,
-		decoder2_dv_data => open,
-		decoder3_dv_addr => open,
-		decoder3_dv_we => open,
-		decoder3_dv_data => open,
+		decoder0_dv_addr => dv_wr0_addr(2*I),
+		decoder0_dv_we => dv_wr0_we(2*I),
+		decoder0_dv_data => dv_wr0_data(2*I),
+		decoder1_dv_addr => dv_wr1_addr(2*I),
+		decoder1_dv_we => dv_wr1_we(2*I),
+		decoder1_dv_data => dv_wr1_data(2*I),
+		decoder2_dv_addr => dv_wr0_addr(2*I+1),
+		decoder2_dv_we => dv_wr0_we(2*I+1),
+		decoder2_dv_data => dv_wr0_data(2*I+1),
+		decoder3_dv_addr => dv_wr1_addr(2*I+1),
+		decoder3_dv_we => dv_wr1_we(2*I+1),
+		decoder3_dv_data => dv_wr1_data(2*I+1),
 		
 		prog_ok => enable_programming,
 		prog_addr => reg.prog_reg_addr,
 		prog_data => reg.prog_reg_data,
-		prog_encoder_we => reg.prog_encoder_we(2*I+1 downto 2*I), -- 2 and 3 reserved
-		prog_pc_filter_we => reg.prog_pc_filter_we(2*I+1 downto 2*I), -- 2 and 3 reserved
+		prog_encoder_we => reg.prog_encoder_we(2*I+1 downto 2*I), -- 2 and 3 not used
+		prog_pc_filter_we => reg.prog_pc_filter_we(2*I+1 downto 2*I), -- 2 and 3 not used
 		prog_pc_lfsr_we => reg.prog_pc_lfsr_we(I),
 		prog_pc_we => reg.prog_pc_we(I),
 		prog_decoder_memory_we => reg.prog_decoder_memory_we(I)

@@ -72,11 +72,45 @@ component ethernet_tx_handler port (
   tx_fifo_full: in std_logic
 ); end component;
 
+component ethernet_rx_fifo PORT (
+    rst : IN STD_LOGIC;
+    wr_clk : IN STD_LOGIC;
+    rd_clk : IN STD_LOGIC;
+    din : IN STD_LOGIC_VECTOR(8 DOWNTO 0);
+    wr_en : IN STD_LOGIC;
+    rd_en : IN STD_LOGIC;
+    dout : OUT STD_LOGIC_VECTOR(8 DOWNTO 0);
+    full : OUT STD_LOGIC;
+    empty : OUT STD_LOGIC
+  ); end component ethernet_rx_fifo;
+
+component ethernet_tx_channel port (
+	clk: in std_logic;
+	rst: in std_logic;
+	data: in std_logic_vector(7 downto 0);
+	tx_en: in std_logic; -- to TX FIFO !empty
+	tx_last: in std_logic;
+	rd_en: out std_logic; -- to TX FIFO read enable
+	MAC_TD: out std_logic_vector(7 downto 0);
+	MAC_TX_EN: out std_logic;
+	MAC_TX_ERR: out std_logic
+); end component;
+
 signal station_mac: std_logic_vector(47 downto 0) := X"000A35028FC0";
-signal tx_data: std_logic_vector(7 downto 0);
-signal tx_last: std_logic;
-signal tx_we: std_logic;
-signal tx_full: std_logic;
+signal tx_fifo_data: std_logic_vector(7 downto 0);
+signal tx_fifo_last: std_logic;
+signal tx_fifo_we: std_logic;
+signal tx_fifo_full: std_logic;
+
+signal tx_chan_data: std_logic_vector(7 downto 0);
+signal tx_chan_last: std_logic;
+signal tx_chan_re: std_logic;
+signal tx_fifo_empty: std_logic;
+
+signal tx_en: std_logic;
+signal gmii_txd: std_logic_vector(7 downto 0);
+signal gmii_tx_en: std_logic;
+signal gmii_tx_er: std_logic;
 
 begin
 
@@ -128,10 +162,37 @@ uut: ethernet_tx_handler port map (
 	ch_fifo_count => fifo_data_count,
 	ch_fifo_frame_ready => fifo_prog_full,
 	ch_done => done,
-	tx_fifo_data => tx_data,
-	tx_fifo_last => tx_last,
-	tx_fifo_we => tx_we,
-	tx_fifo_full => tx_full
+	tx_fifo_data => tx_fifo_data,
+	tx_fifo_last => tx_fifo_last,
+	tx_fifo_we => tx_fifo_we,
+	tx_fifo_full => tx_fifo_full
+);
+
+TX_FIFO: ethernet_rx_fifo port map (
+	rst => rst,
+	wr_clk => clk,
+	rd_clk => clk,
+	din(8) => tx_fifo_last,
+	din(7 downto 0) => tx_fifo_data,
+	wr_en => tx_fifo_we,
+	rd_en => tx_chan_re,
+	dout(8) => tx_chan_last,
+	dout(7 downto 0) => tx_chan_data,
+	full => tx_fifo_full,
+	empty => tx_fifo_empty
+);
+tx_en <= not tx_fifo_empty;
+
+TX_CHANNEL: ethernet_tx_channel port map (
+	clk => clk,
+	rst => rst,
+	data => tx_chan_data,
+	tx_en => tx_en,
+	tx_last => tx_chan_last,
+	rd_en => tx_chan_re,
+	MAC_TD => gmii_txd,
+	MAC_TX_EN => gmii_tx_en,
+	MAC_TX_ERR => gmii_tx_er
 );
 
 tb: process
@@ -140,8 +201,7 @@ begin
 	start <= '0';	
 	prog_ok <= '0';
 	prog_we <= '0';
-	prog_data <= (others=>'0');
-	tx_full <= '0';
+	prog_data <= (others=>'0');	
 	wait for CLOCK_PERIOD*5;
 	rst <= '0';
 	wait for CLOCK_PERIOD*3;
@@ -151,7 +211,12 @@ begin
 	
 	prog_we <= '1';
 	-- read 12 words from DV buffer 0 port 0, starting at address 4
-	prog_data <= "1" & "0" & "00000000" & "00000000100" & "00000001011" & "0000";
+	--prog_data <= "1" & "0" & "00000000" & "00000000100" & "00000001011" & "0000";
+	--wait for CLOCK_PERIOD;
+	
+	prog_data <= "001100000000000000000000000000000000";
+	wait for CLOCK_PERIOD;
+	prog_data <= "100000000010000000000000000000000000";
 	wait for CLOCK_PERIOD;
 	
 	prog_we <= '0';
@@ -159,9 +224,13 @@ begin
 	
 	wait for CLOCK_PERIOD*3;
 	
-	start <= '1';
-	wait for CLOCK_PERIOD;
-	start <= '0';
+	loop
+		start <= '1';
+		wait for CLOCK_PERIOD;
+		start <= '0';
+		wait until tx_fifo_last = '1';
+		wait for CLOCK_PERIOD*3;
+	end loop;
 	
 	wait;
 end process tb;
