@@ -53,6 +53,7 @@ begin
                     null; -- this is handled as a reset condition.
                 when state_wait_for_fifo =>
                     if(fifo_full = '0') then -- FIXME check for glitches on this deassertion, there may be latency
+								next_we := '1';
                         next_counter := INIT_COUNTER;
                         next_state := state_init_fifo;
                     end if;
