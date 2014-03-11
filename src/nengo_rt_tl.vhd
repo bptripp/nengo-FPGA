@@ -243,7 +243,7 @@ component bank_lock port (
 ); end component;
 
 
-constant NUMBER_OF_ENCODERS: integer := 8;
+constant NUMBER_OF_ENCODERS: integer := 16;
 signal encoder_addr: encoder_addresses(0 to NUMBER_OF_ENCODERS-1);
 signal encoder_data: dv_data(0 to NUMBER_OF_ENCODERS-1);
 
@@ -569,14 +569,13 @@ POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
 		timestep => timestep,
 		encoder_done => encoder_done(I),
 		all_done => all_done(I),
-		
-		encoder0_dv_addr => encoder_addr(I)(18 downto 0),
-		encoder0_dv_port => encoder_addr(I)(19),
-		encoder0_dv_data => encoder_data(I),
-		-- FIXME temporarily not using encoder #1
-		encoder1_dv_addr => open,
-		encoder1_dv_port => open,
-		encoder1_dv_data => (others=>'0'),
+				
+		encoder0_dv_addr => encoder_addr(2*I)(18 downto 0),
+		encoder0_dv_port => encoder_addr(2*I)(19),
+		encoder0_dv_data => encoder_data(2*I),		
+		encoder1_dv_addr => encoder_addr(2*I+1)(18 downto 0),
+		encoder1_dv_port => encoder_addr(2*I+1)(19),
+		encoder1_dv_data => encoder_data(2*I+1),
 		
 		decoder0_dv_addr => dv_wr0_addr(2*I),
 		decoder0_dv_we => dv_wr0_we(2*I),

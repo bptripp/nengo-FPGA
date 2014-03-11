@@ -63,14 +63,14 @@ architecture rtl of programmable_decoder_1d is
            pc6_data: in std_logic_vector(11 downto 0);
            normal_data: in std_logic_vector(11 downto 0);
            
-           v0: sfixed(1 downto -10);
-           v1: sfixed(1 downto -10);
-           v2: sfixed(1 downto -10);
-           v3: sfixed(1 downto -10);
-           v4: sfixed(1 downto -10);
-           v5: sfixed(1 downto -10);
-           v6: sfixed(1 downto -10);
-           vr: sfixed(1 downto -10); -- for Gaussian noise
+           v0: in sfixed(1 downto -10);
+           v1: in sfixed(1 downto -10);
+           v2: in sfixed(1 downto -10);
+           v3: in sfixed(1 downto -10);
+           v4: in sfixed(1 downto -10);
+           v5: in sfixed(1 downto -10);
+           v6: in sfixed(1 downto -10);
+           vr: in sfixed(1 downto -10); -- for Gaussian noise
            
            valid: out std_logic;
            decoded_value: out sfixed(1 downto -10)                   
