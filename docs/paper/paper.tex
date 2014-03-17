@@ -52,7 +52,7 @@ However, because the decoded value buffers have a fixed number of access ports f
 a maximum of two encoder units are allowed to access a single decoded value buffer simultaneously
 without causing a bus collision.
 
-Each encoder unit is attached to a circular buffer of size 8192 % FIXME check the size
+Each encoder unit is attached to a circular buffer of size 8192
 containing a list of instructions for calculating one encoded value. 
 This size was chosen as a compromise between memory utilization and encoder flexibility.
 Each instruction corresponds to delaying for one or more clock cycles
@@ -77,7 +77,7 @@ the beginning of the next timestep.
 Encoded values are passed from the encoder units to the population units. Population units are either one-dimensional
 (functions of one variable) or two-dimensional (functions of two variables).
 Both types of population unit receive input from two encoder units in each input dimension;
-for each dimension, the encoded values are passed through a separate first-order filter to simulate % FIXME ...post-synaptic time constant?
+for each dimension, the encoded values are passed through a first-order filter which performs post-synaptic filtering, % FIXME check this
 and then summed. The value resulting from this operation is
 truncated to the most significant 10 bits and is then used as input to a set of lookup tables,
 implemented as a bank of synchronous RAM elements. SRAMs are used
@@ -93,7 +93,7 @@ The extra resources used to perform this operation are modest
 and significantly reduce the amount of memory used for two-dimensional populations while maintaining a good degree of accuracy of representation.
 
 To simulate the noise resulting from a neural representation, a pseudorandom Gaussian noise generator is implemented in each population unit.
-The output from the noise generator is passed through a programmable second-order filter to approximate the power spectrum of the noise
+The output from the noise generator is passed through a pre-defined second-order filter to approximate the power spectrum of the noise
 that would be present if individual neurons were being implemented. % FIXME fact check and possibly get a citation
 
 The interpolated values from the principal component lookup tables and the filtered noise sample are multiplied by a vector of decoders,
@@ -155,7 +155,7 @@ without requiring physical access to the hardware.
 \item encoder instruction buffer size limits number of decoded values that can be encoded
 
 There is an artificial limitation on the complexity of the encoding operation due to the length of the instruction buffer that is used.
-With a size of 8192, % FIXME check size
+With a size of 8192,
 because each encoder must produce 1024 encoded values per timestep, a maximum of eight instructions, and therefore eight decoded values
 (not necessarily distinct)
 can be used in encoding. It is theoretically possible to implement an encoding operation that requires more decoded values to be used,
@@ -166,6 +166,10 @@ It is expected that the compiler will be able to detect this scenario and reorga
 
 As only one-dimensional and two-dimensional population units have been implemented, networks that require populations to compute functions
 of three or more independent variables cannot be simulated with this design.
+However, the majority of existing models in Nengo do not use populations with more than two input dimensions, so with the exception of
+certain very large or very complex models that require representation of high-dimensional quantities, providing only one- and two-dimensional
+populations is not expected to be overly restrictive.
+
 \item four decoded values per population -- using more will create copies of populations to accommodate extra decoders
 
 The choice of using a maximum of four sets of decoder vectors per population is arbitrary; it seems to be a good balance between
@@ -182,10 +186,22 @@ distinct populations that can be simulated.
 \begin{itemize}
 \item VC707 board
 \item resources available -- BRAM, DSP
+
+A hardware implementation of the Nengo-RT design was produced on a Xilinx VC707 development board, which includes a modern field-programmable gate array (FPGA)
+device (Xilinx XC7VX485T-2FFG1761C). This device was chosen because of its ready availability on a development platform and its large logic capacity and available resources.
+In particular, it provides 37~080~Kb of on-chip block RAM and 2~800 customizable DSP slices, both of which the Nengo-RT design requires in abundance in order to support
+the largest possible implementation size. 
+
 \item implemented design -- number of population units, DV buffers
+
 \item FPGA resources utilized; maximum theoretical design size
 \item clock speed and implications of this
 \item Ethernet communication for control and I/O -- maximum channel capacity in terms of DVs
+
+The VC707 development board provides a Gigabit Ethernet PHY that can be used for fast off-board communication to a PC.
+A simple Ethernet transceiver was implemented as part of the Nengo-RT design to expose a programming interface to the Nengo software,
+as well as to provide input and output of decoded values during simulation.
+
 \end{itemize}
 
 \subsection{Nengo backend}
