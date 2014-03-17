@@ -2,10 +2,16 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{babel}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
 
 \newcommand{\design}{Nengo-RT}
 
 \begin{document}
+
+\lstset{basicstyle=\footnotesize}
 
 \section{Introduction}
 
@@ -202,7 +208,59 @@ calculate encoder schedule, create programming file
 
 \section{Results}
 
-\subsection{basic simulation}
+To verify the correct operation of the hardware as well as the software backend to Nengo, a simple network consisting of a single neural integrator was compiled and simulated on the hardware.
+Figure~\ref{lst:integrator1d} shows the code listing and the resulting network that it describes.
+\begin{figure}
+\centering
+
+\begin{subfigure}[b]{\textwidth}
+\centering
+\lstset{language=Python}
+\begin{lstlisting}[frame=single]
+import nengo
+import nengo.helpers
+model = nengo.Model(label='Integrator')
+input = nengo.Node(nengo.helpers.piecewise({0:0.5}), label='Input')
+tau = 0.1
+A = nengo.Ensemble(nengo.LIF(100, tau_rc=0.02, tau_ref=0.002,
+                   dimensions=1, label='Integrator'))
+nengo.Connection(A, A, transform=[[1]], filter=tau)
+nengo.Connection(input, A, transform=[[tau]], filter=tau)
+p1 = nengo.Probe(input, 'output')
+p2 = nengo.Probe(A, 'decoded_output', filter=0.01)
+\end{lstlisting}
+\caption{Source code}
+\label{lst:integrator1d:code}
+\end{subfigure}
+
+\begin{subfigure}[b]{0.3\textwidth}
+\centering
+\includegraphics[width=3.0in]{integrator-1d-schematic.eps}
+\caption{Schematic}
+\label{lst:integrator1d:schematic}
+\end{subfigure}
+
+\caption[A 1D neural integrator in Nengo.]
+{Source code (\ref{lst:integrator1d:code}) and schematic (\ref{lst:integrator1d:schematic}) of a 1D neural integrator in Nengo.}
+\label{lst:integrator1d}
+\end{figure}
+
+% FIXME explanation of the code?
+The network was compiled with the Nengo-RT backend to produce a programming file that could be used to configure the simulator hardware.
+Simulation output from the FPGA was captured with an Ethernet traffic sniffer and plotted in Figure~\ref{fig:integrator1d}.
+
+\begin{figure}
+\centering
+
+\includegraphics[width=6in]{integrator-1d.eps}
+
+\caption[Simulation of a 1D neural integrator.]
+{Hardware output from simulation of a one-dimensional population representing a neural integrator.}
+
+\label{fig:integrator1d}
+\end{figure}
+
+% FIXME discussion of result?
 
 \subsection{elaborate simulations}
 
