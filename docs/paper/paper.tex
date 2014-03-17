@@ -185,7 +185,7 @@ distinct populations that can be simulated.
 \item VC707 board
 \item resources available -- BRAM, DSP
 
-A hardware implementation of the Nengo-RT design was produced on a Xilinx VC707 development board, which includes a modern field-programmable gate array (FPGA)
+A hardware implementation of the \design{} design was produced on a Xilinx VC707 development board, which includes a modern field-programmable gate array (FPGA)
 device (Xilinx XC7VX485T-2FFG1761C). This device was chosen because of its ready availability on a development platform and its large logic capacity and available resources.
 In particular, it provides 37~080~Kb of on-chip block RAM and 2~800 customizable DSP slices, both of which the Nengo-RT design requires in abundance in order to support
 the largest possible implementation size. 
@@ -194,6 +194,15 @@ the largest possible implementation size.
 
 \item FPGA resources utilized; maximum theoretical design size
 \item clock speed and implications of this
+
+The implemented hardware operates at a clock speed of 125~MHz, using the same extermal clock source as the Gigabit Ethernet PHY.
+This is convenient as it means that the entire design, including both the simulator hardware and the I/O interfaces, operates from the same clock source.
+Because of this, there is no latency when receiving input or transmitting output to and from the simulation;
+if two different clock speeds were used, extra buffers would have to be implemented in order to ``cross'' the two clock domains,
+and the logic operating in the faster clock domain would occasionally have to wait for the slower-clocked logic to consume input from the buffer.
+This type of stall would prevent part of the simulator from operating in real-time; by using the same clock for all logic, however, this problem is averted and
+both input and output are wait-free.
+
 \item Ethernet communication for control and I/O -- maximum channel capacity in terms of DVs
 
 The VC707 development board provides a Gigabit Ethernet PHY that can be used for fast off-board communication to a PC.
