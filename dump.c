@@ -28,7 +28,7 @@ void process_packet(u_char *args, const struct pcap_pkthdr *header, const u_char
   unsigned int count = boarddata->board_paircount + 1;
   unsigned int i;
   for(i = 0; i < count; ++i){
-    printf("%.2x%.2x%.2x", (unsigned int)payload[0], (unsigned int)payload[1], (unsigned int)payload[2]);
+    printf("%.2x%.2x%.2x", (unsigned int)payload[3*i+0], (unsigned int)payload[3*i+1], (unsigned int)payload[3*i+2]);
   }
   printf("\n");
 }
