@@ -246,6 +246,7 @@ begin
                 ci.page_word_addr := reg.page_word_addr + X"1";
                 ci.page_we := '1';
                 ci.page_buffer(7 downto 4) := frame_data(3 downto 0);
+					 ci.state := state_cmd_pagewrite_data2;
             when state_cmd_pagewrite_data2 =>
                 ci.page_data := reg.page_buffer(7 downto 4) & frame_data;                
                 ci.page_word_addr := reg.page_word_addr + X"1";      

@@ -23,6 +23,12 @@ def makeframe_RESET():
 def makeframe_START():
     return makeframe("\xFE", "")
 
+def makeframe_SINGLESTEP():
+    return makeframe("\xFD", "")
+
+def makeframe_PAUSE():
+    return makeframe("\xFC", "")
+
 def binstring(s):
     retval = ""
     rest = s
@@ -37,7 +43,7 @@ s.bind(("eth1", 0))
 
 print("Resetting...")
 s.send(makeframe_RESET())
-sleep(0.001)
+sleep(0.1)
 
 print("Programming with " + sys.argv[1])
 f = open(sys.argv[1], 'r')
@@ -47,9 +53,15 @@ for line in f:
     addr = tmp[0]
     data = tmp[1]
     s.send(makeframe('\x00', binstring(addr) + binstring(data)))
-    sleep(0.001)
+    #sleep(0.001)
 
 print("Starting run...")
 s.send(makeframe_START())
+
+sleep(0.1)
+
+print("Updating input DVs...")
+# write 393216 = 0.0, 393217 = 0.0 (input bank #0 address #0 is board physical address #393216, etc.)
+s.send(makeframe("\x01", "\x00\x00\x00\x00\x00\x00")) 
 
 print("done")

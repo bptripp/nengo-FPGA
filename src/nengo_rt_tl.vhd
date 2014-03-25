@@ -73,6 +73,15 @@ end entity;
 
 architecture rtl of nengo_rt_tl is
 
+constant POPULATION_UNITS_1D: integer := 2;
+constant POPULATION_UNITS_2D: integer := 1;
+constant NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS: integer := 2*(POPULATION_UNITS_1D + POPULATION_UNITS_2D);
+constant NUMBER_OF_DV_BANKS: integer := NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + 1;
+constant NUMBER_OF_INPUT_DV_BANKS: integer := NUMBER_OF_DV_BANKS - NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS;
+constant NUMBER_OF_OUTPUT_CHANNELS: integer := 1; -- must be less than or equal to NUMBER_OF_ENCODERS
+
+constant NUMBER_OF_ENCODERS: integer := 2*POPULATION_UNITS_1D + 4*POPULATION_UNITS_2D;
+
 function and_reduce(V: std_logic_vector)
 return std_logic is
     variable result: std_logic;
@@ -215,7 +224,7 @@ component dv_double_buffer port (
         prog_we: in std_logic;
         prog_data: in std_logic_vector(11 downto 0)
 ); end component;
-constant NUMBER_OF_DV_BANKS: integer := 17;
+
 
 signal swap_banks: std_logic_vector(NUMBER_OF_DV_BANKS-1 downto 0);
 type dv_addr_type is array(0 to NUMBER_OF_DV_BANKS-1) of std_logic_vector(10 downto 0);
@@ -243,7 +252,6 @@ component bank_lock port (
 ); end component;
 
 
-constant NUMBER_OF_ENCODERS: integer := 16;
 signal encoder_addr: encoder_addresses(0 to NUMBER_OF_ENCODERS-1);
 signal encoder_data: dv_data(0 to NUMBER_OF_ENCODERS-1);
 
@@ -252,7 +260,6 @@ signal encoder_select: encoder_selection_type; -- the idea is that encoder_selec
 type reverse_encoder_selection_type is array(0 to NUMBER_OF_ENCODERS-1) of std_logic_vector(2*NUMBER_OF_DV_BANKS-1 downto 0);
 signal reverse_encoder_select: reverse_encoder_selection_type; -- effectively, reverse_encoder_select(X) is the concatenation of encoder_select(*)(X)
 
-constant NUMBER_OF_OUTPUT_CHANNELS: integer := 1; -- must be less than or equal to NUMBER_OF_ENCODERS
 -- addresses provided from output channel
 signal output_channel_dv_addr: encoder_addresses(0 to NUMBER_OF_OUTPUT_CHANNELS-1);
 -- duplicates encoder data
@@ -338,10 +345,72 @@ component population_unit_1d port (
 	prog_pc_we: in std_logic;
 	prog_decoder_memory_we: in std_logic	
 ); end component population_unit_1d;
-constant NUMBER_OF_POPULATION_UNITS: integer := 8;
+
+component population_unit_2d port (
+	clk: in std_logic;
+	rst: in std_logic;
+	timestep: in std_logic;
+	encoder_done: out std_logic; -- from encoder pipeline controller
+	all_done: out std_logic; -- from decoder bottom half
+	
+	-- X dimension encoder#0,1
+	
+	-- encoder 0 connection to DV interconnect
+	encoder0_dv_addr: out std_logic_vector(18 downto 0);
+	encoder0_dv_port: out std_logic;
+	encoder0_dv_data: in std_logic_vector(11 downto 0);
+	-- encoder 1 connection to DV interconnect
+	encoder1_dv_addr: out std_logic_vector(18 downto 0);
+	encoder1_dv_port: out std_logic;
+	encoder1_dv_data: in std_logic_vector(11 downto 0);
+	
+	-- Y dimension encoder#2,3
+	
+	-- encoder 2 connection to DV interconnect
+	encoder2_dv_addr: out std_logic_vector(18 downto 0);
+	encoder2_dv_port: out std_logic;
+	encoder2_dv_data: in std_logic_vector(11 downto 0);
+	-- encoder 3 connection to DV interconnect
+	encoder3_dv_addr: out std_logic_vector(18 downto 0);
+	encoder3_dv_port: out std_logic;
+	encoder3_dv_data: in std_logic_vector(11 downto 0);
+	
+	-- decoder 0 connection to DV block
+	decoder0_dv_addr: out std_logic_vector(10 downto 0);
+	decoder0_dv_we: out std_logic;
+	decoder0_dv_data: out std_logic_vector(11 downto 0);
+	-- decoder 1 connection to DV block
+	decoder1_dv_addr: out std_logic_vector(10 downto 0);
+	decoder1_dv_we: out std_logic;
+	decoder1_dv_data: out std_logic_vector(11 downto 0);
+	-- decoder 2 connection to DV block
+	decoder2_dv_addr: out std_logic_vector(10 downto 0);
+	decoder2_dv_we: out std_logic;
+	decoder2_dv_data: out std_logic_vector(11 downto 0);
+	-- decoder 3 connection to DV block
+	decoder3_dv_addr: out std_logic_vector(10 downto 0);
+	decoder3_dv_we: out std_logic;	
+	decoder3_dv_data: out std_logic_vector(11 downto 0);
+	-- programming interface shared addr/data
+	prog_ok: in std_logic;
+	prog_addr: in std_logic_vector(20 downto 0);
+	prog_data: in std_logic_vector(39 downto 0);
+	-- programming interface target write-enable
+	prog_encoder_we: in std_logic_vector(3 downto 0);
+	prog_pc_filter_we: in std_logic_vector(3 downto 0);
+	prog_pc_lfsr_we: in std_logic;
+	prog_pc_we: in std_logic;
+	prog_decoder_memory_we: in std_logic
+	
+); end component population_unit_2d;
+
+
+constant NUMBER_OF_POPULATION_UNITS: integer := POPULATION_UNITS_1D + POPULATION_UNITS_2D;
 signal encoder_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0);
 signal all_encoders_done: std_logic;
 signal all_done: std_logic_vector(NUMBER_OF_POPULATION_UNITS-1 downto 0); -- FIXME this should be renamed something like "decoder_done" or "population_done"
+
+
 
 begin
 
@@ -475,14 +544,14 @@ DECODE_PAGE_EN: for I in 0 to 63 generate
     page_wr_en(I) <= page_en(I) and page_we;
 end generate;
 
-DEFAULT_SWAP_BANKS: for I in 0 to 7 generate
+DEFAULT_SWAP_BANKS: for I in 0 to NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS-1 generate 
     swap_banks(I) <= timestep;
 end generate;
-INPUT_SWAP_BANKS: for I in 8 to NUMBER_OF_DV_BANKS-1 generate
+INPUT_SWAP_BANKS: for I in NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS to NUMBER_OF_DV_BANKS-1 generate
     LOCK: bank_lock port map (
         clk => clk_125,
         rst => system_reset,
-        en => page_en(I-8), -- FIXME was (I-1), but (I-8) seems correct as only page_wr_en(0) and therefore page_en(0) actually used (by input bank 192)
+        en => page_en(I-NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS), 
         lock => page_lock,
         timestep => timestep,
         swap_banks => swap_banks(I)
@@ -495,74 +564,50 @@ REVERSE_ENCODER_OUTER: for X in 0 to NUMBER_OF_ENCODERS-1 generate
     end generate;
 end generate;
 
-DV_BANKS: for I in 0 to 15 generate
-	DV_BANK: dv_double_buffer port map (
+-- input banks are addressed starting at 192
+INPUT_BANKS: for I in 0 to NUMBER_OF_INPUT_DV_BANKS-1 generate
+	INPUT_BANK: dv_double_buffer port map (
 		 clk => clk_125,
 		 rst => system_reset,
-		 swap_banks => swap_banks(I),
-		 rd0_addr => dv_rd0_addr(I),
-		 rd0_data => dv_rd0_data(I),
-		 rd1_addr => dv_rd1_addr(I),
-		 rd1_data => dv_rd1_data(I),
-		 wr0_addr => dv_wr0_addr(I),
-		 wr0_we => dv_wr0_we(I),
-		 wr0_data => dv_wr0_data(I),
-		 wr1_addr => dv_wr1_addr(I),
-		 wr1_we => dv_wr1_we(I),
-		 wr1_data => dv_wr1_data(I),
+		 swap_banks => swap_banks(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 rd0_addr => dv_rd0_addr(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 rd0_data => dv_rd0_data(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 rd1_addr => dv_rd1_addr(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 rd1_data => dv_rd1_data(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 wr0_addr => page_word_addr,
+		 wr0_we => page_wr_en(I),
+		 wr0_data => page_data,
+		 wr1_addr => "00000000000",
+		 wr1_we => '0',
+		 wr1_data => X"000",
 		 prog_ok => enable_programming,
 		 prog_addr => reg.prog_reg_addr(10 downto 0),
-		 prog_we => reg.prog_dv_we(I),
+		 prog_we => reg.prog_dv_we(192 + I),
 		 prog_data => reg.prog_reg_data(11 downto 0)
 	);
-	MUX_TO_DV_PORT0: mux_to_dv_port generic map (
+	MUX_TO_INPUT_DV_PORT0: mux_to_dv_port generic map (
 		 N => NUMBER_OF_ENCODERS,
-		 decode => "0" & std_logic_vector(to_unsigned(I, 8))
+		 -- decode => "0" & X"C0"
+		 decode => "0" & std_logic_vector(to_unsigned(192 + I, 8))
 	) port map (
 		 clk => clk_125,
 		 data => encoder_addr_to_mux,
-		 output => dv_rd0_addr(I),
-		 selected => encoder_select(I)
+		 output => dv_rd0_addr(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 selected => encoder_select(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I)
 	);
-end generate DV_BANKS;
+	MUX_TO_INPUT_DV_PORT1: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 -- decode => "0" & X"C0"
+		 decode => "1" & std_logic_vector(to_unsigned(192 + I, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd1_addr(NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I),
+		 selected => encoder_select(NUMBER_OF_DV_BANKS + NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + I)
+	);
+end generate;
 
-INPUT_BANK192: dv_double_buffer port map (
-    clk => clk_125,
-    rst => system_reset,
-    swap_banks => swap_banks(16),
-    rd0_addr => dv_rd0_addr(16),
-    rd0_data => dv_rd0_data(16),
-    rd1_addr => dv_rd1_addr(16),
-    rd1_data => dv_rd1_data(16),
-    wr0_addr => page_word_addr,
-    wr0_we => page_wr_en(0),
-    wr0_data => page_data,
-    wr1_addr => "00000000000",
-    wr1_we => '0',
-    wr1_data => X"000",
-    prog_ok => enable_programming,
-    prog_addr => reg.prog_reg_addr(10 downto 0),
-    prog_we => reg.prog_dv_we(192),
-    prog_data => reg.prog_reg_data(11 downto 0)
-);
-MUX_TO_DV192_PORT0: mux_to_dv_port generic map (
-    N => NUMBER_OF_ENCODERS,
-    decode => "0" & X"C0"
-) port map (
-    clk => clk_125,
-    data => encoder_addr_to_mux,
-    output => dv_rd0_addr(16),
-    selected => encoder_select(16)
-);
-
--- FIXME the following generate blocks must be updated when more DV blocks are added
---encoder_select(9 to 17) <= (others=>(others=>'0'));
---FAKE_DV_RD1: for I in 0 to 8 generate
---	dv_rd1_addr(I) <= dv_rd0_addr(0);
---end generate;
-
-
-POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
+POPULATIONS_1D: for I in 0 to POPULATION_UNITS_1D-1 generate
 	POPULATION_UNIT: population_unit_1d port map (
 		clk => clk_125,
 		rst => system_reset,
@@ -593,8 +638,8 @@ POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
 		prog_ok => enable_programming,
 		prog_addr => reg.prog_reg_addr,
 		prog_data => reg.prog_reg_data,
-		prog_encoder_we => reg.prog_encoder_we(2*I+1 downto 2*I), -- 2 and 3 not used
-		prog_pc_filter_we => reg.prog_pc_filter_we(2*I+1 downto 2*I), -- 2 and 3 not used
+		prog_encoder_we => reg.prog_encoder_we(4*I+1 downto 4*I), -- 2 and 3 not used
+		prog_pc_filter_we => reg.prog_pc_filter_we(4*I+1 downto 4*I), -- 2 and 3 not used
 		prog_pc_lfsr_we => reg.prog_pc_lfsr_we(I),
 		prog_pc_we => reg.prog_pc_we(I),
 		prog_decoder_memory_we => reg.prog_decoder_memory_we(I)
@@ -605,10 +650,248 @@ POPULATION_UNITS: for I in 0 to NUMBER_OF_POPULATION_UNITS-1 generate
 		 clk => clk_125,
 		 data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
 		 data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
-		 sel => reverse_encoder_select(I),
-		 output => encoder_data(I)
+		 sel => reverse_encoder_select(2*I),
+		 output => encoder_data(2*I)
 	);
-end generate POPULATION_UNITS;
+	MUX_TO_ENCODER1: mux_to_encoding_controller generic map (
+		N => 2*NUMBER_OF_DV_BANKS
+	) port map (
+		 clk => clk_125,
+		 data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
+		 data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
+		 sel => reverse_encoder_select(2*I+1),
+		 output => encoder_data(2*I+1)
+	);
+	DV_BANK0: dv_double_buffer port map (
+		 clk => clk_125,
+		 rst => system_reset,
+		 swap_banks => swap_banks(2*I),
+		 rd0_addr => dv_rd0_addr(2*I),
+		 rd0_data => dv_rd0_data(2*I),
+		 rd1_addr => dv_rd1_addr(2*I),
+		 rd1_data => dv_rd1_data(2*I),
+		 wr0_addr => dv_wr0_addr(2*I),
+		 wr0_we => dv_wr0_we(2*I),
+		 wr0_data => dv_wr0_data(2*I),
+		 wr1_addr => dv_wr1_addr(2*I),
+		 wr1_we => dv_wr1_we(2*I),
+		 wr1_data => dv_wr1_data(2*I),
+		 prog_ok => enable_programming,
+		 prog_addr => reg.prog_reg_addr(10 downto 0),
+		 prog_we => reg.prog_dv_we(2*I),
+		 prog_data => reg.prog_reg_data(11 downto 0)
+	);
+	MUX_TO_DV_PORT0_BANK0: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "0" & std_logic_vector(to_unsigned(2*I, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd0_addr(2*I),
+		 selected => encoder_select(2*I)
+	);
+	MUX_TO_DV_PORT1_BANK0: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "1" & std_logic_vector(to_unsigned(2*I, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd1_addr(2*I),
+		 selected => encoder_select(NUMBER_OF_DV_BANKS + 2*I)
+	);
+	DV_BANK1: dv_double_buffer port map (
+		 clk => clk_125,
+		 rst => system_reset,
+		 swap_banks => swap_banks(2*I+1),
+		 rd0_addr => dv_rd0_addr(2*I+1),
+		 rd0_data => dv_rd0_data(2*I+1),
+		 rd1_addr => dv_rd1_addr(2*I+1),
+		 rd1_data => dv_rd1_data(2*I+1),
+		 wr0_addr => dv_wr0_addr(2*I+1),
+		 wr0_we => dv_wr0_we(2*I+1),
+		 wr0_data => dv_wr0_data(2*I+1),
+		 wr1_addr => dv_wr1_addr(2*I+1),
+		 wr1_we => dv_wr1_we(2*I+1),
+		 wr1_data => dv_wr1_data(2*I+1),
+		 prog_ok => enable_programming,
+		 prog_addr => reg.prog_reg_addr(10 downto 0),
+		 prog_we => reg.prog_dv_we(2*I+1),
+		 prog_data => reg.prog_reg_data(11 downto 0)
+	);
+	MUX_TO_DV_PORT0_BANK1: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "0" & std_logic_vector(to_unsigned(2*I+1, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd0_addr(2*I+1),
+		 selected => encoder_select(2*I+1)
+	);
+	MUX_TO_DV_PORT1_BANK1: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "1" & std_logic_vector(to_unsigned(2*I+1, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd1_addr(2*I+1),
+		 selected => encoder_select(NUMBER_OF_DV_BANKS + 2*I+1)
+	);
+end generate;
+
+POPULATIONS_2D: for I in 0 to POPULATION_UNITS_2D-1 generate
+	POPULATION_UNIT: population_unit_2d port map (
+		clk => clk_125,
+		rst => system_reset,
+		timestep => timestep,
+		encoder_done => encoder_done(POPULATION_UNITS_1D+I),
+		all_done => all_done(POPULATION_UNITS_1D+I),
+				
+		encoder0_dv_addr => encoder_addr(2*POPULATION_UNITS_1D + 4*I)(18 downto 0),
+		encoder0_dv_port => encoder_addr(2*POPULATION_UNITS_1D + 4*I)(19),
+		encoder0_dv_data => encoder_data(2*POPULATION_UNITS_1D + 4*I),		
+		encoder1_dv_addr => encoder_addr(2*POPULATION_UNITS_1D + 4*I+1)(18 downto 0),
+		encoder1_dv_port => encoder_addr(2*POPULATION_UNITS_1D + 4*I+1)(19),
+		encoder1_dv_data => encoder_data(2*POPULATION_UNITS_1D + 4*I+1),		
+		encoder2_dv_addr => encoder_addr(2*POPULATION_UNITS_1D + 4*I+2)(18 downto 0),
+		encoder2_dv_port => encoder_addr(2*POPULATION_UNITS_1D + 4*I+2)(19),
+		encoder2_dv_data => encoder_data(2*POPULATION_UNITS_1D + 4*I+2),		
+		encoder3_dv_addr => encoder_addr(2*POPULATION_UNITS_1D + 4*I+3)(18 downto 0),
+		encoder3_dv_port => encoder_addr(2*POPULATION_UNITS_1D + 4*I+3)(19),
+		encoder3_dv_data => encoder_data(2*POPULATION_UNITS_1D + 4*I+3),
+		
+		decoder0_dv_addr => dv_wr0_addr(2*(POPULATION_UNITS_1D+I)),
+		decoder0_dv_we => dv_wr0_we(2*(POPULATION_UNITS_1D+I)),
+		decoder0_dv_data => dv_wr0_data(2*(POPULATION_UNITS_1D+I)),
+		decoder1_dv_addr => dv_wr1_addr(2*(POPULATION_UNITS_1D+I)),
+		decoder1_dv_we => dv_wr1_we(2*(POPULATION_UNITS_1D+I)),
+		decoder1_dv_data => dv_wr1_data(2*(POPULATION_UNITS_1D+I)),
+		decoder2_dv_addr => dv_wr0_addr(2*(POPULATION_UNITS_1D+I)+1),
+		decoder2_dv_we => dv_wr0_we(2*(POPULATION_UNITS_1D+I)+1),
+		decoder2_dv_data => dv_wr0_data(2*(POPULATION_UNITS_1D+I)+1),
+		decoder3_dv_addr => dv_wr1_addr(2*(POPULATION_UNITS_1D+I)+1),
+		decoder3_dv_we => dv_wr1_we(2*(POPULATION_UNITS_1D+I)+1),
+		decoder3_dv_data => dv_wr1_data(2*(POPULATION_UNITS_1D+I)+1),
+		
+		prog_ok => enable_programming,
+		prog_addr => reg.prog_reg_addr,
+		prog_data => reg.prog_reg_data,
+		prog_encoder_we => reg.prog_encoder_we(4*(95-I)+3 downto 4*(95-I)),
+		prog_pc_filter_we => reg.prog_pc_filter_we(4*(95-I)+3 downto 4*(95-I)),
+		prog_pc_lfsr_we => reg.prog_pc_lfsr_we((95-I)),
+		prog_pc_we => reg.prog_pc_we((95-I)),
+		prog_decoder_memory_we => reg.prog_decoder_memory_we((95-I))
+	);
+	MUX_TO_ENCODER0: mux_to_encoding_controller generic map (
+		N => 2*NUMBER_OF_DV_BANKS
+	) port map (
+		 clk => clk_125,
+		 data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
+		 data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
+		 sel => reverse_encoder_select(2*POPULATION_UNITS_1D + 4*I),
+		 output => encoder_data(2*POPULATION_UNITS_1D + 4*I)
+	);
+	MUX_TO_ENCODER1: mux_to_encoding_controller generic map (
+		N => 2*NUMBER_OF_DV_BANKS
+	) port map (
+		 clk => clk_125,
+		 data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
+		 data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
+		 sel => reverse_encoder_select(2*POPULATION_UNITS_1D + 4*I+1),
+		 output => encoder_data(2*POPULATION_UNITS_1D + 4*I+1)
+	);
+	MUX_TO_ENCODER2: mux_to_encoding_controller generic map (
+		N => 2*NUMBER_OF_DV_BANKS
+	) port map (
+		 clk => clk_125,
+		 data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
+		 data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
+		 sel => reverse_encoder_select(2*POPULATION_UNITS_1D + 4*I+2),
+		 output => encoder_data(2*POPULATION_UNITS_1D + 4*I+2)
+	);
+	MUX_TO_ENCODER3: mux_to_encoding_controller generic map (
+		N => 2*NUMBER_OF_DV_BANKS
+	) port map (
+		 clk => clk_125,
+		 data(NUMBER_OF_DV_BANKS-1 downto 0) => dv_rd0_data,
+		 data(2*NUMBER_OF_DV_BANKS - 1 downto NUMBER_OF_DV_BANKS) => dv_rd1_data,
+		 sel => reverse_encoder_select(2*POPULATION_UNITS_1D + 4*I+3),
+		 output => encoder_data(2*POPULATION_UNITS_1D + 4*I+3)
+	);
+	DV_BANK0: dv_double_buffer port map (
+		 clk => clk_125,
+		 rst => system_reset,
+		 swap_banks => swap_banks(2*(POPULATION_UNITS_1D+I)),
+		 rd0_addr => dv_rd0_addr(2*(POPULATION_UNITS_1D+I)),
+		 rd0_data => dv_rd0_data(2*(POPULATION_UNITS_1D+I)),
+		 rd1_addr => dv_rd1_addr(2*(POPULATION_UNITS_1D+I)),
+		 rd1_data => dv_rd1_data(2*(POPULATION_UNITS_1D+I)),
+		 wr0_addr => dv_wr0_addr(2*(POPULATION_UNITS_1D+I)),
+		 wr0_we => dv_wr0_we(2*(POPULATION_UNITS_1D+I)),
+		 wr0_data => dv_wr0_data(2*(POPULATION_UNITS_1D+I)),
+		 wr1_addr => dv_wr1_addr(2*(POPULATION_UNITS_1D+I)),
+		 wr1_we => dv_wr1_we(2*(POPULATION_UNITS_1D+I)),
+		 wr1_data => dv_wr1_data(2*(POPULATION_UNITS_1D+I)),
+		 prog_ok => enable_programming,
+		 prog_addr => reg.prog_reg_addr(10 downto 0),
+		 prog_we => reg.prog_dv_we(2*(95 - I)),
+		 prog_data => reg.prog_reg_data(11 downto 0)
+	);
+	MUX_TO_DV_PORT0_BANK0: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "0" & std_logic_vector(to_unsigned(2*(95 - I), 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd0_addr(2*(POPULATION_UNITS_1D+I)),
+		 selected => encoder_select(2*(POPULATION_UNITS_1D+I))
+	);
+	MUX_TO_DV_PORT1_BANK0: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "1" & std_logic_vector(to_unsigned(2*(95 - I), 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd1_addr(2*(POPULATION_UNITS_1D+I)),
+		 selected => encoder_select(NUMBER_OF_DV_BANKS + 2*(POPULATION_UNITS_1D+I))
+	);
+	DV_BANK1: dv_double_buffer port map (
+		 clk => clk_125,
+		 rst => system_reset,
+		 swap_banks => swap_banks(2*(POPULATION_UNITS_1D+I)+1),
+		 rd0_addr => dv_rd0_addr(2*(POPULATION_UNITS_1D+I)+1),
+		 rd0_data => dv_rd0_data(2*(POPULATION_UNITS_1D+I)+1),
+		 rd1_addr => dv_rd1_addr(2*(POPULATION_UNITS_1D+I)+1),
+		 rd1_data => dv_rd1_data(2*(POPULATION_UNITS_1D+I)+1),
+		 wr0_addr => dv_wr0_addr(2*(POPULATION_UNITS_1D+I)+1),
+		 wr0_we => dv_wr0_we(2*(POPULATION_UNITS_1D+I)+1),
+		 wr0_data => dv_wr0_data(2*(POPULATION_UNITS_1D+I)+1),
+		 wr1_addr => dv_wr1_addr(2*(POPULATION_UNITS_1D+I)+1),
+		 wr1_we => dv_wr1_we(2*(POPULATION_UNITS_1D+I)+1),
+		 wr1_data => dv_wr1_data(2*(POPULATION_UNITS_1D+I)+1),
+		 prog_ok => enable_programming,
+		 prog_addr => reg.prog_reg_addr(10 downto 0),
+		 prog_we => reg.prog_dv_we(2*(95 - I)+1),
+		 prog_data => reg.prog_reg_data(11 downto 0)
+	);
+	MUX_TO_DV_PORT0_BANK1: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "0" & std_logic_vector(to_unsigned(2*(95-I)+1, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd0_addr(2*(POPULATION_UNITS_1D+I)+1),
+		 selected => encoder_select(2*(POPULATION_UNITS_1D+I)+1)
+	);
+	MUX_TO_DV_PORT1_BANK1: mux_to_dv_port generic map (
+		 N => NUMBER_OF_ENCODERS,
+		 decode => "1" & std_logic_vector(to_unsigned(2*(95-I)+1, 8))
+	) port map (
+		 clk => clk_125,
+		 data => encoder_addr_to_mux,
+		 output => dv_rd1_addr(2*(POPULATION_UNITS_1D+I)+1),
+		 selected => encoder_select(NUMBER_OF_DV_BANKS + 2*(POPULATION_UNITS_1D+I)+1)
+	);
+end generate;
 
 all_encoders_done <= and_reduce(encoder_done);
 all_decoders_done <= and_reduce(all_done);
