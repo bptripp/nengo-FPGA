@@ -181,19 +181,12 @@ distinct populations that can be simulated.
 
 \subsection{Implementation details}
 
-\begin{itemize}
-\item VC707 board
-\item resources available -- BRAM, DSP
-
 A hardware implementation of the \design{} design was produced on a Xilinx VC707 development board, which includes a modern field-programmable gate array (FPGA)
 device (Xilinx XC7VX485T-2FFG1761C). This device was chosen because of its ready availability on a development platform and its large logic capacity and available resources.
 In particular, it provides 37~080~Kb of on-chip block RAM and 2~800 customizable DSP slices, both of which the Nengo-RT design requires in abundance in order to support
 the largest possible implementation size. 
 
-\item implemented design -- number of population units, DV buffers
-
-\item FPGA resources utilized; maximum theoretical design size
-\item clock speed and implications of this
+% FIXME implemented design size
 
 The implemented hardware operates at a clock speed of 125~MHz, using the same extermal clock source as the Gigabit Ethernet PHY.
 This is convenient as it means that the entire design, including both the simulator hardware and the I/O interfaces, operates from the same clock source.
@@ -203,13 +196,11 @@ and the logic operating in the faster clock domain would occasionally have to wa
 This type of stall would prevent part of the simulator from operating in real-time; by using the same clock for all logic, however, this problem is averted and
 both input and output are wait-free.
 
-\item Ethernet communication for control and I/O -- maximum channel capacity in terms of DVs
-
 The VC707 development board provides a Gigabit Ethernet PHY that can be used for fast off-board communication to a PC.
 A simple Ethernet transceiver was implemented as part of the Nengo-RT design to expose a programming interface to the Nengo software,
 as well as to provide input and output of decoded values during simulation.
 
-\end{itemize}
+% FIXME maximum channel capacity in terms of decoded values
 
 \subsection{Nengo backend}
 
@@ -223,7 +214,42 @@ calculate encoder schedule, create programming file
 \item Nengo will then program the board and communicate with it during simulation
 \end{itemize}
 
+% FIXME quick description of Nengo
+Nengo's ensembles of neurons become populations that are simulated in the hardware on population units.
+Connections between populations are handled through encoders and decoders.
+Nodes and probes, which collect data or evaluate arbitrary functions in software, are
+simulated on the host computer and are transferred to and from the board over hardware 
+I/O channels.
+
+A backend to Nengo performs the task of compiling a Nengo model to a loadfile that can be
+simulated on the hardware. The compiler calculates principal components for each population
+of neurons, and then performs a clustering operation in order to associate many
+populations with each set of principal components while minimizing the differences
+between the approximate principal components and the actual values.
+The compiler calculates decoders and encoders for each population with respect
+to the shared principal components, and computes an optimized encoder schedule
+that coordinates reads made by each encoder so that all operations can be performed
+in as few clock cycles as possible while avoiding a read collision on any decoded value block.
+Once the compiler has finished writing out the loadfile, the Nengo simulator
+transfers the configuration data to the hardware and controls input and output during the simulation.
+
 \section{Results}
+
+% integrator (1d)
+% oscillator (2d)
+% feed-forward nonlinear functions
+% 2D multiplication
+
+% scope of situations for which it works well
+% full neurons vs. CPU populations vs. hardware populations
+% high-frequency breakdown (square wave, sinusoids)
+% qualitative comparison: show the figure, talk about the figure
+% possible quantitative approach (RMSE)
+
+% hardware-specific results: how many populations, 
+% circumstances under which an overflow could occur
+% (probabilistic analysis), power analysis,
+% resource utilization
 
 To verify the correct operation of the hardware as well as the software backend to Nengo, a simple network consisting of a single neural integrator was compiled and simulated on the hardware.
 Figure~\ref{lst:integrator1d} shows the code listing and the resulting network that it describes.
@@ -277,9 +303,67 @@ Simulation output from the FPGA was captured with an Ethernet traffic sniffer an
 \label{fig:integrator1d}
 \end{figure}
 
-% FIXME discussion of result?
+Given a constant input value of 0.5, the output from the integrator approaches this value
+over time and reaches it after 1.0 seconds, then continues to accumulate the input until
+another second has elapsed. The population saturates and remains at 1.0 after this time
+because it is not able to represent values with a magnitude greater than 1.0. However,
+the integrator's behaviour for the first two seconds of simulation is correct and confirms
+the proper operation of the one-dimensional population hardware.
 
-\subsection{elaborate simulations}
+The two-dimensional population unit was tested with a simple single-population van der Pol oscillator.
+Figure~\ref{lst:oscillator2d} shows the code listing and the network generated in Nengo;
+Figure~\ref{fig:oscillator2d} shows output from the \design{} hardware simulation.
+\begin{figure}
+\centering
+
+\begin{subfigure}[b]{\textwidth}
+\centering
+\lstset{language=Python}
+\begin{lstlisting}[frame=single]
+import nengo
+import nengo.helpers
+model = nengo.Model('Oscillator')
+neurons = nengo.Ensemble(nengo.LIF(200), dimensions=2, label='van der Pol Oscillator')
+input = nengo.Node(output=nengo.helpers.piecewise({0:[1,0], 0.1:[0,0], label='Initial condition')
+tau = 0.1
+freq = 5.0
+input2output = nengo.Connection(input, neurons)
+recurrent = nengo.Connection(neurons, neurons, transform=[[1, -freq*tau],[freq*tau,1]], filter=tau)
+input_probe = nengo.Probe(input, 'output')
+neuron_probe = nengo.Probe(neurons, 'decoded_output', filter=0.005)
+\end{lstlisting}
+\caption{Source Code}
+\label{lst:oscillator2d:code}
+\end{subfigure}
+
+\begin{subfigure}[b]{0.3\textwidth}
+\centering
+% FIXME \includegraphics[width=3.0in]{oscillator-2d-schematic.eps}
+\caption{Schematic}
+\label{lst:oscillator2d:schematic}
+\end{subfigure}
+
+\caption[A 2D neural oscillator in Nengo.]
+{Source code (\ref{lst:oscillator2d:code}) and schematic (\ref{lst:oscillator2d:schematic})
+of a 2D neural oscillator in Nengo.}
+\label{lst:oscillator2d}
+\end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=6in]{oscillator-2d.eps}
+
+\caption[Simulation of a 2D neural oscillator.]
+{Hardware output from the simulation of a two-dimensional population representing a neural oscillator.}
+\label{fig:oscillator2d}
+\end{figure}
+
+The oscillator requires a brief non-zero ``start-up'' input in order to begin oscillating.
+After this input disappears (0.1~s), both dimensions of the decoded output can be seen to
+oscillate in a sinusoidal fashion. This oscillation, once started, will proceed indefinitely.
+% FIXME frequency analysis?
+The oscillation as observed in the figure confirms the correct operation of the two-dimensional
+population hardware.
 
 \subsection{power, \% timestep used for each simulation, \% of board resources for each simulation}
 
