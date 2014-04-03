@@ -323,12 +323,15 @@ Figure~\ref{fig:oscillator2d} shows output from the \design{} hardware simulatio
 import nengo
 import nengo.helpers
 model = nengo.Model('Oscillator')
-neurons = nengo.Ensemble(nengo.LIF(200), dimensions=2, label='van der Pol Oscillator')
-input = nengo.Node(output=nengo.helpers.piecewise({0:[1,0], 0.1:[0,0], label='Initial condition')
+neurons = nengo.Ensemble(nengo.LIF(200), dimensions=2, 
+  label='van der Pol Oscillator')
+input = nengo.Node(output=nengo.helpers.piecewise(
+  {0:[1,0], 0.1:[0,0], label='Initial condition')
 tau = 0.1
 freq = 5.0
 input2output = nengo.Connection(input, neurons)
-recurrent = nengo.Connection(neurons, neurons, transform=[[1, -freq*tau],[freq*tau,1]], filter=tau)
+recurrent = nengo.Connection(neurons, neurons, 
+  transform=[[1, -freq*tau],[freq*tau,1]], filter=tau)
 input_probe = nengo.Probe(input, 'output')
 neuron_probe = nengo.Probe(neurons, 'decoded_output', filter=0.005)
 \end{lstlisting}
@@ -372,6 +375,12 @@ population hardware.
 \subsection{How well it worked}
 
 \subsection{Limitations}
+
+% things that Nengo can do that we can't do:
+% >2d representation
+% inhibitory connections
+% learning
+% high-frequency stuff (this will depend on other results)
 
 \subsection{Future work \& extensions}
 
