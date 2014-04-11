@@ -593,23 +593,9 @@ begin
     start <= '1';
     wait for CLOCK125_PERIOD;
     start <= '0';
-
-	 wait for 25 us;
-	 wait until falling_edge(clk_125);
-	 page_lock <= '1';
-	 wait for CLOCK125_PERIOD;
-	 page_block_addr <= "000000";
-	 page_word_addr <= "00000000000";
-	 page_we <= '1';
-	 page_data <= X"000";
-	 wait for CLOCK125_PERIOD;
-	 page_word_addr <= "00000000001";
-	 page_we <= '1';	
-	 wait for CLOCK125_PERIOD;
-	 page_we <= '0';
-	 wait for CLOCK125_PERIOD;
-	 page_lock <= '0';
     
+	 -- FIXME program input for multiplier
+	 
     wait;
 end process tb;
 

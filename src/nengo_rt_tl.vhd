@@ -73,12 +73,13 @@ end entity;
 
 architecture rtl of nengo_rt_tl is
 
-constant POPULATION_UNITS_1D: integer := 2;
-constant POPULATION_UNITS_2D: integer := 1;
-constant NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS: integer := 2*(POPULATION_UNITS_1D + POPULATION_UNITS_2D);
-constant NUMBER_OF_DV_BANKS: integer := NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + 1;
-constant NUMBER_OF_INPUT_DV_BANKS: integer := NUMBER_OF_DV_BANKS - NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS;
+constant POPULATION_UNITS_1D: integer := 1; -- can be 0
+constant POPULATION_UNITS_2D: integer := 1; -- can be 0
+constant NUMBER_OF_INPUT_DV_BANKS: integer := 1; -- really should be at least 1
 constant NUMBER_OF_OUTPUT_CHANNELS: integer := 1; -- must be less than or equal to NUMBER_OF_ENCODERS
+
+constant NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS: integer := 2*(POPULATION_UNITS_1D + POPULATION_UNITS_2D);
+constant NUMBER_OF_DV_BANKS: integer := NUMBER_OF_DV_BANKS_RESERVED_FOR_POPULATION_UNITS + NUMBER_OF_INPUT_DV_BANKS;
 
 constant NUMBER_OF_ENCODERS: integer := 2*POPULATION_UNITS_1D + 4*POPULATION_UNITS_2D;
 

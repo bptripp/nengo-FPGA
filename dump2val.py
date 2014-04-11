@@ -27,7 +27,12 @@ for line in open(sys.argv[1]):
         line = line[3:]
         i += 1
 
+ch = 0
 for pts in dataPoints:
-    plt.plot(pts)
+    plt.plot(pts, label="Channel " + str(ch))
+    ch += 1
 
+print(str(ch) + " channels")
+
+plt.legend(loc='best')
 plt.show()
