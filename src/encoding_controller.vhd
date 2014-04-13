@@ -78,8 +78,8 @@ architecture Behavioral of encoding_controller is
     
     signal reg: ci_type :=
     (
-        dv_addr => "0000000000000000000",
-        dv_port => '0',
+        dv_addr => "1111111111111111111",
+        dv_port => '1',
         sum => "000000000000", 
         done => '0', -- FIXME was 1
 
@@ -126,9 +126,9 @@ begin
         ci.sum := resize(reg.sum + reg.weight * to_sfixed(dv_data, 1, -10), ci.sum);
         
         if(rst = '1') then            
-            ci.dv_addr := "0000000000000000000";
+            ci.dv_addr := "1111111111111111111";
             --ci.dv_cs := '0';
-            ci.dv_port := '0';
+            ci.dv_port := '1';
             ci.sum := "000000000000";
             ci.done := '0'; -- FIXME was 1, this should not break anything in the pipelined design
             
