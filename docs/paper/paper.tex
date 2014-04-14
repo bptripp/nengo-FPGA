@@ -368,6 +368,89 @@ oscillate in a sinusoidal fashion. This oscillation, once started, will proceed 
 The oscillation as observed in the figure confirms the correct operation of the two-dimensional
 population hardware.
 
+As a test of a combined network with both one-dimensional and two-dimensional populations,
+a neural multiplier was simulated on the hardware. Figure~\ref{lst:multiplier} shows
+the code listing and the resulting network that it describes.
+
+\begin{figure}
+\centering
+
+\begin{subfigure}[b]{\textwidth}
+\centering
+\lstset{language=Python}
+\begin{lstlisting}[frame=single]
+import nengo
+import nengo.helpers
+model = nengo.Model('Multiplier')
+A = nengo.Ensemble(nengo.LIF(100), dimensions=1,
+  radius=1.4, label='A')
+B = nengo.Ensemble(nengo.LIF(100), dimensions=1,
+  radius=1.4, label='B')
+combined = nengo.Ensemble(nengo.LIF(224), dimensions=2,
+  radius=2, label='combined')
+prod = nengo.Ensemble(nengo.LIF(100), dimensions=1,
+  radius=2, label='prod')
+
+inputA = nengo.Node(nengo.helpers.piecewise
+  ({0:0, 2.5:0.5, 4:-0.5}))
+inputB = nengo.Node(nengo.helpers.piecewise
+  ({0:1.0, 1.5:0.8, 3:0.0, 4.5:0.8}))
+
+nengo.Connection(inputA, A)
+nengo.Connection(inputB, B)
+
+nengo.Connection(A, combined, transform=[[1],[0]])
+nengo.Connection(B, combined, transform=[[0],[1]])
+
+def product(x):
+  return x[0] * x[1]
+
+nengo.Connection(combined, prod, function=product)
+
+A_probe = nengo.Probe(A, 'decoded_output', filter=0.01)
+B_probe = nengo.Probe(B, 'decoded_output', filter=0.01)
+prod_probe = nengo.Probe(prod, 'decoded_output', filter=0.01)
+\end{lstlisting}
+\caption{Source code}
+\label{lst:multiplier:code}
+\end{subfigure}
+
+\begin{subfigure}[b]{0.3\textwidth}
+\centering
+% \includegraphics[width=3.0in]{multiplier-schematic.eps} % FIXME
+\caption{Schematic}
+\label{lst:multiplier:schematic}
+\end{subfigure}
+
+\caption[A multiplier in Nengo.]
+{Source code(\ref{lst:multiplier:code}) and schematic (\ref{lst:multiplier:schematic})
+of a multiplier in Nengo.}
+\label{lst:multiplier}
+\end{figure}
+
+% FIXME: explain input and expected output
+
+Simulation of this network in hardware produced results comparable to those obtained in software
+(Figure~\ref{fig:multiplier}).
+
+\begin{figure}
+\centering
+
+% FIXME software subfigure
+
+\begin{subfigure}[b]{0.5\textwidth}
+\centering
+\includegraphics[width=3in]{multiplier.eps}
+\caption{Hardware}
+\label{fig:multiplier:hw}
+\end{subfigure}
+
+\caption[Multiplier simulation comparison.]
+{Comparison of software (FIXME) and hardware (\ref{fig:multiplier:hw})
+simulation of a neural multiplier network.}
+\label{fig:multiplier}
+\end{figure}
+
 \subsection{power, \% timestep used for each simulation, \% of board resources for each simulation}
 
 \section{Discussion}
