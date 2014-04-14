@@ -417,7 +417,7 @@ prod_probe = nengo.Probe(prod, 'decoded_output', filter=0.01)
 
 \begin{subfigure}[b]{0.3\textwidth}
 \centering
-% \includegraphics[width=3.0in]{multiplier-schematic.eps} % FIXME
+\includegraphics[width=3.0in]{multiplier-schematic.eps}
 \caption{Schematic}
 \label{lst:multiplier:schematic}
 \end{subfigure}
@@ -436,7 +436,12 @@ Simulation of this network in hardware produced results comparable to those obta
 \begin{figure}
 \centering
 
-% FIXME software subfigure
+\begin{subfigure}[b]{0.5\textwidth}
+\centering
+\includegraphics[width=3in]{multiplier-sw.eps}
+\caption{Software}
+\label{fig:multiplier:sw}
+\end{subfigure}
 
 \begin{subfigure}[b]{0.5\textwidth}
 \centering
@@ -446,7 +451,7 @@ Simulation of this network in hardware produced results comparable to those obta
 \end{subfigure}
 
 \caption[Multiplier simulation comparison.]
-{Comparison of software (FIXME) and hardware (\ref{fig:multiplier:hw})
+{Comparison of software (\ref{fig:multiplier:sw}) and hardware (\ref{fig:multiplier:hw})
 simulation of a neural multiplier network.}
 \label{fig:multiplier}
 \end{figure}
