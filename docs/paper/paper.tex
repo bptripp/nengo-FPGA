@@ -171,8 +171,6 @@ from the perspective of the encoders and interconnect, but instead of being writ
 they are connected to one or more input channels which are responsible for receiving data from an external source
 and writing it to the buffers.
 
-% FIXME small diagram of hypothetical system in the loop (UI, robot, hardware, etc.)
-
 To provide output to an external source, such as a simulation GUI running on a computer, one or more output channels
 are made accessible on the hardware. The exact number of output channels, as well as their features, will depend on the hardware used to implement the design.
 The function of the output channel is to read from the decoded value buffers and output the desired decoded values to be transmitted
@@ -186,6 +184,17 @@ so these operations can be performed in parallel).
 
 Both the input and output channels are transport-agnostic and can be attached to application-specific custom hardware that allows for
 I/O to be performed over the desired interface, such as Ethernet. The implemented design performs I/O over Gigabit Ethernet using a custom Ethernet frame format for efficiency.
+Input and output channels could also be implemented for sensors and actuators to allow for autonomous operation of a Nengo network in hardware once it has been sent to the board
+(Figure~\ref{fig:closedloop}).
+
+\begin{figure}
+\centering
+
+\includegraphics[width=5.0in]{robot-closed-loop.eps}
+
+\caption{Block diagram of a high-level closed-loop autonomous system using \design{}.}
+\label{fig:closedloop}
+\end{figure}
 
 The top-level module exposes a programming interface that allows for any of the runtime configurable components
 (decoded value buffers, encoders, population unit filters, principal component lookup tables,
@@ -207,7 +216,6 @@ without increasing the size of the instruction buffers,
 but the extra instructions used for this mean that other populations sharing that encoder will have to use fewer.
 The compiler can detect this scenario and reorganize populations appropriately so as to avoid overfilling the instruction buffers.
 
-% FIXME citation about why 2D is ``good enough''
 As only one-dimensional and two-dimensional population units have been implemented, networks that require populations to compute functions
 of three or more independent variables cannot be simulated with this design.
 However, the majority of existing models in Nengo do not use populations with more than two input dimensions.
