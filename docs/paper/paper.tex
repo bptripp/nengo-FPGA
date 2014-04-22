@@ -266,6 +266,10 @@ and the logic operating in the faster clock domain would occasionally have to wa
 This type of stall would prevent part of the simulator from operating in real-time; by using the same clock for all logic, however, this problem is averted and
 both input and output are wait-free.
 
+Power analysis showed that the implemented design, with 7 one-dimensional and 7 two-dimensional population units,
+is estimated to use a maximum of 5.675~W of power while a simulation is running, assuming all population units are fully utilized.
+With the installed heatsink and fan on the VC707 board, the FPGA is expected to operate at an on-die temperature of $31.5\,^{\circ}{\rm C}$.
+
 The VC707 development board provides a Gigabit Ethernet transceiver that can be used for fast off-board communication to a PC.
 A simple Ethernet stack was implemented as part of the Nengo-RT design to expose a programming interface to the Nengo software,
 as well as to provide input and output of decoded values during simulation.
@@ -535,8 +539,6 @@ Simulation of this network in hardware produced results comparable to those obta
 simulation of a neural multiplier network.}
 \label{fig:multiplier}
 \end{figure}
-
-\subsection{power, \% timestep used for each simulation, \% of board resources for each simulation}
 
 \section{Discussion}
 
