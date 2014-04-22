@@ -268,6 +268,8 @@ both input and output are wait-free.
 
 Power analysis showed that the implemented design, with 7 one-dimensional and 7 two-dimensional population units,
 is estimated to use a maximum of 5.675~W of power while a simulation is running, assuming all population units are fully utilized.
+For an individual population unit, a one-dimensional unit consumes an average of 0.130~W of power during simulation,
+and a two-dimensional unit consumes an average of 0.425~W of power.
 With the installed heatsink and fan on the VC707 board, the FPGA is expected to operate at an on-die temperature of $31.5\,^{\circ}{\rm C}$.
 
 The VC707 development board provides a Gigabit Ethernet transceiver that can be used for fast off-board communication to a PC.
@@ -301,7 +303,17 @@ A backend to Nengo performs the task of compiling a Nengo model to a loadfile th
 simulated on the hardware. The compiler calculates principal components for each population
 of neurons, and then performs a clustering operation in order to associate many
 populations with each set of principal components while minimizing the differences
-between the approximate principal components and the actual values. % FIXME explain/calculate why actual principal components cannot be used
+between the approximate principal components and the actual values. 
+
+Populations must share principal components because storing a separate set of principal components for each population would require
+an unreasonably large amount of memory. As an example, a one-dimensional population currently uses seven principal components,
+each of which is a 1024-word, 12-bit block memory, for a total of 86~016~bits of memory per population.
+The FPGA on the VC707 development board has a maximum of approximately 37~080~000~bits of block memory;
+if we allowed each population to use its own principal components, we could not simulate more than 431 populations this way
+(and this number is halved for two-dimensional populations, which use 15 principal components).
+Therefore, in order to simulate large numbers of populations, it is necessary for large groups of populations to share principal components,
+even though this is not as accurate as providing a ``real'' set of principal components for each separate population.
+
 The compiler calculates decoders and encoders for each population with respect
 to the shared principal components, and computes an optimized encoder schedule % FIXME details needed here
 that coordinates reads made by each encoder so that all operations can be performed
@@ -375,7 +387,7 @@ Simulation output from the FPGA was captured with an Ethernet traffic sniffer an
 \begin{figure}
 \centering
 
-\includegraphics[width=6in]{integrator-1d.eps} % FIXME software plot
+\includegraphics[width=6in]{integrator-1d.eps} % FIXME software plot (for all figures)
 % FIXME figure: larger axis and label font, make this consistent across all figures
 
 \caption[Simulation of a 1D neural integrator.]
@@ -446,7 +458,6 @@ of a 2D neural oscillator in Nengo.}
 The oscillator requires a brief non-zero ``start-up'' input in order to begin oscillating.
 After this input disappears (0.1~s), both dimensions of the decoded output can be seen to
 oscillate in a sinusoidal fashion. This oscillation, once started, will proceed indefinitely.
-% FIXME frequency analysis?
 The oscillation as observed in the figure confirms the correct operation of the two-dimensional
 population hardware.
 
@@ -509,8 +520,6 @@ prod_probe = nengo.Probe(prod, 'decoded_output', filter=0.01)
 of a multiplier in Nengo.}
 \label{lst:multiplier}
 \end{figure}
-
-% FIXME: explain input and expected output
 
 Simulation of this network in hardware produced results comparable to those obtained in software
 (Figure~\ref{fig:multiplier}).
@@ -592,9 +601,7 @@ $NM$ connections must be made between these components in order for every
 encoder to be able to read from every decoded value buffer.
 Note that this is still a massive improvement over a neuron-to-neuron interconnect,
 which would require over 10000 times as many connections to provide all-to-all connectivity.
-% FIXME contrast this with size of neuron-to-neuron interconnect
-For large numbers
-of encoders and decoded value buffers, the complexity of the interconnect at
+For large numbers of encoders and decoded value buffers, the complexity of the interconnect at
 that design size makes it impossible for the FPGA design tools to find a way to
 implement that part of the design on the device. This is currently the limiting
 factor in terms of the number of population units that can be implemented on
