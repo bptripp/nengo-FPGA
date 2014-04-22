@@ -32,7 +32,7 @@
 \subsection{High-level system description}
 
 \design{} is a custom digital hardware design that implements the population-mode NEF in real-time (1~ms timestep).
-% FIXME figure: block diagram
+A block diagram of the design is shown in Figure~\ref{fig:system}.
 The encoder units perform the function of encoding (), % FIXME NEF equation
 while the population units perform the decoding () % FIXME NEF equation
 and write the decoded values to the decoded value buffers
@@ -53,6 +53,16 @@ inputs to a population to come from any combination of decoded values. % FIXME m
 A number of decoded value buffers are reserved for external inputs to the network,
 which can be sent from the controlling computer system over an Ethernet connection.
 The output channels can also be programmed to send decoded values back to the computer over Ethernet.
+
+\begin{figure}
+\centering
+
+\includegraphics[width=6in]{system-block-diagram.eps}
+
+\caption{Block diagram of the \design{} hardware design.}
+
+\label{fig:system}
+\end{figure}
 
 \subsection{Hardware design details}
 
