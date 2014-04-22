@@ -236,10 +236,27 @@ distinct populations that can be simulated.
 
 A hardware implementation of the \design{} design was produced on a Xilinx VC707 development board, which includes a modern field-programmable gate array (FPGA)
 device (Xilinx XC7VX485T-2FFG1761C). This device was chosen because of its ready availability on a development platform and its large logic capacity and available resources.
-In particular, it provides 37080~Kb of on-chip block RAM and 2800 customizable DSP slices, both of which the Nengo-RT design requires in abundance in order to support
-the largest possible implementation size. 
+In particular, it provides 37080~Kb of on-chip block RAM and 2800 customizable DSP slices, both of which the Nengo-RT design requires in abundance.
+Table~\ref{tbl:utilization} outlines the resource utilization of the implemented design.
 
-% FIXME implemented design size
+\begin{table}
+\begin{tabular}{|r|c|c|l|}
+\hline
+Resource & Used & Total & \% Used \\
+\hline
+\hline
+Registers & 82~149 & 607~200 & 13\% \\
+Lookup Tables & 101~859 & 303~600 & 33\% \\
+Logic Slices & 43~596 & 75~900 & 57\% \\
+Block RAM (18~Kb) & 914 & 2060 & 44\% \\
+DSP & 1722 & 2800 & 61\% \\
+\hline
+\end{tabular}
+\caption[\design{} resource utilization on VC707 development board.]
+{Resource utilization of the \design{} design with 7 one-dimensional and 7 two-dimensional population units, and one decoded value buffer reserved for external inputs.
+Resource totals are for the Xilinx XC7VX485T device.}
+\label{tbl:utilization}
+\end{table}
 
 The implemented hardware operates at a clock speed of 125~MHz, using the same external clock source as the Gigabit Ethernet transceiver.
 This is convenient as it means that the entire design, including both the simulator hardware and the I/O interfaces, operates from the same clock source.
