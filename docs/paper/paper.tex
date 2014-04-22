@@ -27,6 +27,8 @@
 
 \subsubsection{Considerations related to hardware (multiplexing, clustering, using principal components)}
 
+% FIXME brief description of FPGA hardware and programming
+
 \subsection{High-level system description}
 
 \design{} is a custom digital hardware design that implements the population-mode NEF in real-time (1~ms timestep).
@@ -37,13 +39,17 @@ and write the decoded values to the decoded value buffers
 to be used as inputs to other populations or as outputs from the network.
 Each population of neurons is assigned to a population unit, which is able to simulate up to 1024 populations
 having either one or two encoded inputs each. These inputs are calculated by the encoder units,
-of which there are two for a one-dimensional population unit and four for a two-dimensional population unit.
-Within each population unit, the decoder weights for each specific population are time-multiplexed
-in order to run more populations on the same hardware, while the principal components are fixed and must be shared
+of which there are two for a one-dimensional population unit and four for a two-dimensional population unit;
+each encoder unit can be associated with a different first-order filter to simulate post-synaptic filtering.
+For example, one of the two encoders on a one-dimensional population unit can be programmed with
+a small time constant to model fast synapses (e.g. AMPA and GABA$_A$), while the second can be programmed
+with a large time constant to model slow synapses (e.g. NMDA and GABA$_B$).
+Each population unit performs time-multiplexing and swaps in different sets of decoders
+in order to run more populations on the same hardware. The principal components are fixed and must be shared
 between all populations on an individual population unit.
 Each population unit writes to a fixed set of decoded value buffers, but a shared interconnect
 allows the encoder units to perform random accesses to these buffers, which allows
-inputs to a population to come from any combination of decoded values.
+inputs to a population to come from any combination of decoded values. % FIXME more detail
 A number of decoded value buffers are reserved for external inputs to the network,
 which can be sent from the controlling computer system over an Ethernet connection.
 The output channels can also be programmed to send decoded values back to the computer over Ethernet.
@@ -52,47 +58,54 @@ The output channels can also be programmed to send decoded values back to the co
 
 \subsubsection{Encoder Unit}
 
+It is too resource-intensive to create a connection from the output of each population unit to the inputs of all population units (including itself).
+In order to allow communication of information across population units, the decoded values from each population are stored in a local buffer.
+Then, every population unit has a number of encoder units that are responsible for reading decoded values from each buffer. 
 Each encoder unit communicates with the decoded value buffers over a shared interconnect, described below.
-This is done in order to allow every encoder to read from every decoded value buffer.
-However, because the decoded value buffers have a fixed number of access ports for reading data,
-a maximum of two encoder units are allowed to access a single decoded value buffer simultaneously
-without causing a bus collision.
+A maximum of two encoder units are allowed to access a single decoded value buffer simultaneously
+without causing a bus collision, since the memory primitives used to implement the buffers have two independent read ports.
 
 Each encoder unit is attached to a circular buffer of size 8192
 containing a list of instructions for calculating one encoded value. 
-This size was chosen as a compromise between memory utilization and encoder flexibility.
-Each instruction corresponds to delaying for one or more clock cycles
-(in order to coordinate concurrent access to the interconnect),
-followed by reading one decoded value a certain address.
-The decoded value data is made available to the encoder unit three clock cycles later
-(due to interconnect delays), at which time it is multiplied by an encoder weight
-and added to the accumulated encoded value, initially 0.
+This size was chosen as a compromise between memory utilization and encoder flexibility;
+it means that a single population can have a maximum fan-in of eight connections (including connections from the population to itself).
+To execute an instruction, the encoder sends the decoded value address it wants to read from to the interconnect
+and then reads the corresponding decoded value on its data input port three clock cycles later.
+The value is then multiplied by a fixed-point weight, which is given as part of the instruction field, and added to an accumulator in the encoder.
+The interconnect is responsible for routing address and value data between the encoders and the buffers.
+A portion of the instruction field provides a delay (expressed as a number of clock cycles) to the encoder before executing this instruction.
+This is necessary when many encoders are accessing the interconnect simultaneously in order to prevent too many of them from reading
+from the same buffer at the same time (which would result in data corruption, because only two concurrent accesses are possible).
 A certain bit in the instruction field acts as a flag to indicate that the encoded value is ready to be passed on to the population unit after this
 instruction finishes executing. The encoder unit then waits for all other encoders to finish in order to synchronize
 access to the shared interconnect, then resets the accumulator and begins encoding the next value.
-
-The encoder units must each perform 1024 encoding operations per timestep.
-To avoid duplication of logic, a single encoding controller connects to all encoder units and is responsible for
+To synchronize encoders across population units, a single encoding controller connects to all encoder units and is responsible for
 signalling them to start encoding when it detects that they have all finished encoding the previous value.
-The encoding controller counts how many values have been encoded per timestep and
-ensures that after 1024 such operations, the encoder units are not signalled to start again until
-the beginning of the next timestep.
 
 \subsubsection{Population Unit}
 
-Encoded values are passed from the encoder units to the population units. Population units are either one-dimensional
-(functions of one variable) or two-dimensional (functions of two variables).
+Encoded values are passed from the encoder units to the population units. 
+Population units are either one-dimensional or two-dimensional.
+This means the groups of neurons they model have firing rates that are static functions of either a one- or two-dimensional represented variable.
 Both types of population unit receive input from two encoder units in each input dimension;
 for each dimension, the encoded values are passed through a first-order filter which performs post-synaptic filtering, % FIXME check this
 and then summed. The value resulting from this operation is
 truncated to the most significant 10 bits and is then used as input to a set of lookup tables,
 implemented as a bank of synchronous RAM elements. SRAMs are used
 because the contents of these tables are not known until simulation-time and therefore the lookups cannot be implemented as hardware logic functions.
-Each lookup table contains the 12-bit fixed-point values of points sampled from the principal components shared by all populations of neurons
-simulated on that population unit. For one-dimensional population units, there are seven such lookup tables, and each one contains
+Each lookup table contains the 12-bit fixed-point values of points sampled from 
+%the principal components shared by all populations of neurons
+%simulated on that population unit. 
+principal components of the spike rates of neurons in a population, as a function of the variable that the population encodes.
+As described further below
+%(Section FIXME)
+, all populations on a population unit must share principal components.
+For one-dimensional population units, there are seven such lookup tables, and each one contains
 1024 values sampled at equally-spaced points on the open interval $(-2, 2)$. For two-dimensional population units,
 there are fifteen lookup tables, each containing 1024 values sampled at equally-spaced points on a square of width 4
 centered at $(0, 0)$. The resulting sample space is a 32x32 grid.
+These numbers of principal components account for most of the variation in spike rates across 1D and 2D populations.
+% FIXME find out exactly how much of this variation they account for over random populations with a variety of parameters, and mention this.
 To increase the accuracy of this representation, each two-dimensional population unit performs bilinear interpolation
 using the least significant five bits of each input variable to determine the distance between sample points. 
 The extra resources used to perform this operation are modest
@@ -100,28 +113,34 @@ and significantly reduce the amount of memory used for two-dimensional populatio
 
 To simulate the noise resulting from a neural representation, a pseudorandom Gaussian noise generator is implemented in each population unit.
 The output from the noise generator is passed through a pre-defined second-order filter to approximate the power spectrum of the noise
-that would be present if individual neurons were being implemented. % FIXME fact check and possibly get a citation
+that would be present if individual neurons were being implemented. % FIXME for completeness, give the transfer function
 
 The interpolated values from the principal component lookup tables and the filtered noise sample are multiplied by a vector of decoders,
-and these results are summed to produce a decoded value. Each population unit can store up to four independent sets of decoders per population being simulated,
+and these results are summed to produce a decoded value. % FIXME refer to equations
+One of the decoders corresponds to a gain term that can be used to control the amplitude of the noise.
+Each population unit can store up to four independent sets of decoders per population being simulated,
 which allows each population to produce a maximum of four decoded values as some function of its inputs
 (and the resulting values of its principal components).
 
 \subsubsection{Decoded Value Buffers and Interconnect}
 
 Decoded values calculated from population units are stored in decoded value buffers, which are fairly large memory banks that can each
-store 2048 decoded values. The buffers themselves expose a read-only interface, accessed by the encoders to read decoded values from the
+store 2048 decoded values. 
+Because each population unit produces 4096 decoded values (1024 DVs from each of four decoder vectors),
+this means that a population unit must be attached to the write ports of two separate decoded value buffers.
+The buffers themselves expose a read-only interface, accessed by the encoders to read decoded values from the
 previous timestep, and a write-only interface, accessed by the population units when new decoded values are calculated.
 Internally, each interface is connected to a separate dual-port RAM; the connections are swapped between RAMs
 at the end of each timestep in order to implement double-buffering, so that it is not possible for encoders to read a
 partially-updated set of decoded values, where some are from the previous timestep and some are freshly written during the current timestep.
+The reason for choosing a size of 2048 is because of this implementation detail; on the particular family of hardware
+that was used to implement the prototype, the largest single-component 12-bit dual-port RAM available has space for 1024 words,
+and two separate RAM components are necessary in order to implement the double buffer, hence a total size of 2048 words of memory.
 % FIXME DV double buffer diagram in here somewhere
-Because each population unit produces 4096 decoded values (1024 DVs from each of four decoder vectors),
-this means that a population unit must be attached to the write-only interfaces of two separate decoded value buffers.
 
 The encoders must share access to the read-only interface of the decoded value buffers. To accomplish this,
 the encoders are connected to the decoded value buffers over a shared interconnect. Access to the decoded value buffers
-is managed by arbiters that inspect the decoded values being read from by encoders and redirect the read operations to the
+is managed by arbiters that inspect the addresses requested by encoders and redirect the read operations to the
 corresponding buffers. A maximum of two encoders may be accessing a single buffer at any one time.
 Therefore, it is up to the compiler to generate a sequence of read instructions for the encoders that ensures that this
 constraint is respected. The delay field in the encoder instruction word can be used for this purpose to make an encoder
@@ -129,13 +148,18 @@ wait until another is finished with its access before attempting to read from th
 
 \subsubsection{Input, Output, and Control}
 
-A number of decoded value buffers are set aside for use as inputs to the simulation. These are indistinguishable from other decoded value buffers
+A number of decoded value buffers, which can be customized at the time the hardware is synthesized
+(but always at least one)
+are set aside for use as inputs to the simulation. These are indistinguishable from other decoded value buffers
 from the perspective of the encoders and interconnect, but instead of being written to by population units,
 they are connected to one or more input channels which are responsible for receiving data from an external source
 and writing it to the buffers.
 
+% FIXME small diagram of hypothetical system in the loop (UI, robot, hardware, etc.)
+
 To provide output to an external source, such as a simulation GUI running on a computer, one or more output channels
-can be implemented whose function is to read from the decoded value buffers and output the desired decoded values to be transmitted
+are made accessible on the hardware. The exact number of output channels, as well as their features, will depend on the hardware used to implement the design.
+The function of the output channel is to read from the decoded value buffers and output the desired decoded values to be transmitted
 to an external device. Output channels do not have access to the interconnect until all encoders have finished all
 encoding operations for this timestep. At that point, the encoders are detached from the interconnect by a separate controller and the output
 channels are attached in their place. This allows the output channels to share interconnect logic with the encoders;
@@ -157,25 +181,30 @@ without requiring physical access to the hardware.
 
 \subsection{Constraints on models}
 
-There is an artificial limitation on the complexity of the encoding operation due to the length of the instruction buffer that is used.
+There is a limitation on the complexity of the encoding operation due to the length of the instruction buffer that is used.
 Because each encoder must produce 1024 encoded values per timestep, using an instruction memory of size 8192 for each encoder means that a maximum of eight decoded values
 can be used as input to each encoder per population.
-It is theoretically possible to simulate populations that require more than eight decoded values to be read by a single encoder,
+If a higher fan-in is required, the hardware design could be modified to allocate more memory to the instruction buffers,
+which in turn would reduce the amount of memory available for other portions of the design.
+It is theoretically possible to simulate populations that require more than eight decoded values to be read by a single encoder
+without increasing the size of the instruction buffers,
 but the extra instructions used for this mean that other populations sharing that encoder will have to use fewer.
-It is expected that the compiler will be able to detect this scenario and reorganize populations appropriately so as to avoid overfilling the instruction buffers.
+The compiler can detect this scenario and reorganize populations appropriately so as to avoid overfilling the instruction buffers.
 
 % FIXME citation about why 2D is ``good enough''
 As only one-dimensional and two-dimensional population units have been implemented, networks that require populations to compute functions
 of three or more independent variables cannot be simulated with this design.
-However, the majority of existing models in Nengo do not use populations with more than two input dimensions, so with the exception of
-certain very large or very complex models that require representation of high-dimensional quantities, providing only one- and two-dimensional
-populations is not expected to be overly restrictive.
+However, the majority of existing models in Nengo do not use populations with more than two input dimensions.
+A controlled oscillator is an example of a kind of NEF network that cannot be simulated in our hardware implementation,
+because it requires the approximation of a three-dimensional nonlinear function. Our implementation can simulate higher-dimensional representations
+by simulating dimensions individually or in pairs, as long as each approximated function is either linear or is nonlinear in only one or two dimensions.
 
 The choice of using a maximum of four sets of decoder vectors per population is arbitrary; it seems to be a good balance between
-population connectivity and memory usage. However, populations that have more than four outgoing connections must be treated specially.
+population connectivity and memory usage. Populations that have more than four outgoing connections must be treated specially.
 Assuming none of the outgoing connections can be combined together (for example, if the function they decode only differs by a constant),
-in order to implement such a population on the simulator, it is necessary to duplicate it and simulate it twice,
-once with the first four decoder vectors and again with the remaining ones. The consequence of this is that a population with more than
+in order to implement such a population on the simulator, it is necessary to duplicate it and simulate it
+$n/4$ times, once for each group of up to four decoder vectors.
+The consequence of this is that a population with more than
 four outgoing connections will be represented as two or more populations in simulation, thereby reducing the actual number of
 distinct populations that can be simulated.
 
@@ -183,12 +212,12 @@ distinct populations that can be simulated.
 
 A hardware implementation of the \design{} design was produced on a Xilinx VC707 development board, which includes a modern field-programmable gate array (FPGA)
 device (Xilinx XC7VX485T-2FFG1761C). This device was chosen because of its ready availability on a development platform and its large logic capacity and available resources.
-In particular, it provides 37~080~Kb of on-chip block RAM and 2~800 customizable DSP slices, both of which the Nengo-RT design requires in abundance in order to support
+In particular, it provides 37080~Kb of on-chip block RAM and 2800 customizable DSP slices, both of which the Nengo-RT design requires in abundance in order to support
 the largest possible implementation size. 
 
 % FIXME implemented design size
 
-The implemented hardware operates at a clock speed of 125~MHz, using the same extermal clock source as the Gigabit Ethernet PHY.
+The implemented hardware operates at a clock speed of 125~MHz, using the same external clock source as the Gigabit Ethernet transceiver.
 This is convenient as it means that the entire design, including both the simulator hardware and the I/O interfaces, operates from the same clock source.
 Because of this, there is no latency when receiving input or transmitting output to and from the simulation;
 if two different clock speeds were used, extra buffers would have to be implemented in order to ``cross'' the two clock domains,
@@ -196,42 +225,46 @@ and the logic operating in the faster clock domain would occasionally have to wa
 This type of stall would prevent part of the simulator from operating in real-time; by using the same clock for all logic, however, this problem is averted and
 both input and output are wait-free.
 
-The VC707 development board provides a Gigabit Ethernet PHY that can be used for fast off-board communication to a PC.
-A simple Ethernet transceiver was implemented as part of the Nengo-RT design to expose a programming interface to the Nengo software,
+The VC707 development board provides a Gigabit Ethernet transceiver that can be used for fast off-board communication to a PC.
+A simple Ethernet stack was implemented as part of the Nengo-RT design to expose a programming interface to the Nengo software,
 as well as to provide input and output of decoded values during simulation.
 
 % FIXME maximum channel capacity in terms of decoded values
 
 \subsection{Nengo backend}
 
-\begin{itemize}
-\item quick description of Nengo
-\item Nengo ensembles are hardware populations
-\item Nengo connections are hardware encoders and decoders
-\item Nengo nodes and probes are hardware I/O endpoints
-\item compiler functions: calculate principal components, map populations to PCs, calculate decoders and encoders,
-calculate encoder schedule, create programming file
-\item Nengo will then program the board and communicate with it during simulation
-\end{itemize}
-
 % FIXME quick description of Nengo
 Nengo's ensembles of neurons become populations that are simulated in the hardware on population units.
 Connections between populations are handled through encoders and decoders.
 Nodes and probes, which collect data or evaluate arbitrary functions in software, are
 simulated on the host computer and are transferred to and from the board over hardware 
-I/O channels.
+I/O channels after every timestep. 
+By default, the hardware operates in real-time; the software receives new output data from the board
+every millisecond and is responsible for processing this data and sending new inputs back to the hardware as quickly as possible.
+The software does not have to send inputs for every timestep; if no new data is sent, the old values will be preserved.
+This means that more work can be done in software while still operating the hardware in real-time by, for example,
+only computing new input values every fifth timestep.
+If strict synchronization is necessary, or if real-time operation is not possible,
+the hardware can be run in a single-step mode, which forces it to pause after completing each timestep in order
+to allow the software time to complete its tasks, which may include updating plots, logging received data to a file,
+computing node functions, and calculating and sending new input values to the hardware.
+This mode of operation, while not real-time, makes it possible to run hardware-assisted simulations
+on a slower PC or when the software component is too complex or slow to be performed in sync with the hardware
+(for example, logging a large number of decoded values to a hard drive).
 
 A backend to Nengo performs the task of compiling a Nengo model to a loadfile that can be
 simulated on the hardware. The compiler calculates principal components for each population
 of neurons, and then performs a clustering operation in order to associate many
 populations with each set of principal components while minimizing the differences
-between the approximate principal components and the actual values.
+between the approximate principal components and the actual values. % FIXME explain/calculate why actual principal components cannot be used
 The compiler calculates decoders and encoders for each population with respect
-to the shared principal components, and computes an optimized encoder schedule
+to the shared principal components, and computes an optimized encoder schedule % FIXME details needed here
 that coordinates reads made by each encoder so that all operations can be performed
 in as few clock cycles as possible while avoiding a read collision on any decoded value block.
 Once the compiler has finished writing out the loadfile, the Nengo simulator
 transfers the configuration data to the hardware and controls input and output during the simulation.
+
+% clustering algorithm, quantization error for large populations -- this needs its own section
 
 \section{Results}
 
@@ -250,6 +283,8 @@ transfers the configuration data to the hardware and controls input and output d
 % circumstances under which an overflow could occur
 % (probabilistic analysis), power analysis,
 % resource utilization
+
+% FIXME may need a simpler example first -- just an input driving an identity population from 0 to 0.5 in steps of 0.1. This is good for contrast.
 
 To verify the correct operation of the hardware as well as the software backend to Nengo, a simple network consisting of a single neural integrator was compiled and simulated on the hardware.
 Figure~\ref{lst:integrator1d} shows the code listing and the resulting network that it describes.
@@ -295,7 +330,8 @@ Simulation output from the FPGA was captured with an Ethernet traffic sniffer an
 \begin{figure}
 \centering
 
-\includegraphics[width=6in]{integrator-1d.eps}
+\includegraphics[width=6in]{integrator-1d.eps} % FIXME software plot
+% FIXME figure: larger axis and label font, make this consistent across all figures
 
 \caption[Simulation of a 1D neural integrator.]
 {Hardware output from simulation of a one-dimensional population representing a neural integrator.}
@@ -313,6 +349,7 @@ the proper operation of the one-dimensional population hardware.
 The two-dimensional population unit was tested with a simple single-population van der Pol oscillator.
 Figure~\ref{lst:oscillator2d} shows the code listing and the network generated in Nengo;
 Figure~\ref{fig:oscillator2d} shows output from the \design{} hardware simulation.
+
 \begin{figure}
 \centering
 
@@ -436,6 +473,8 @@ Simulation of this network in hardware produced results comparable to those obta
 \begin{figure}
 \centering
 
+% FIXME change the bounds on the axes to make it easier to see the similarities
+
 \begin{subfigure}[b]{0.5\textwidth}
 \centering
 \includegraphics[width=3in]{multiplier-sw.eps}
@@ -464,22 +503,37 @@ simulation of a neural multiplier network.}
 
 \subsection{Limitations}
 
-% things that Nengo can do that we can't do:
-% >2d representation
-% inhibitory connections
-% learning
+Our current implementation does not support populations that represent variables of three or more dimensions.
+Support for higher-dimensional populations could be added in the future.
+However, as the number of dimensions increases, the
+amount of memory that must be used to store principal components and
+decoders increases as well; therefore, beyond a certain number of
+dimensions it would become impractical to implement a hardware
+population unit.  
+
+Nengo supports a more advanced connection called a learning connection,
+which mdoifies the decoders of a population according to a particular ``learning rule''
+as a function of other represented values. The hardware design does not support this special connection type.
+It was decided to implement the most common cases first in order to demonstrate the feasibility of simulating
+neural networks in population mode on the hardware, and since many networks do not use learning connections,
+support for them was omitted from this version.
+
+Most connections in Nengo have both positive and negative synaptic weights. This
+structure is meant as a simplified model of a common excitatory/inhibitory circuit
+(Parisien et al.) % FIXME citation
+Nengo also has a special kind of connection called an inhibitory connection that
+reduces activity in all neurons of the target population. We did not model this kind of connection explicitly.
+However, such a connection onto a 1D population could be modelled by treating the population as 2D,
+setting the second element of each neuron's encoder to -1, and connecting inhibitory inputs to this dimension.
+
 % high-frequency stuff (this will depend on other results)
 
 \subsection{Future work \& extensions}
 
-\begin{itemize}
-\item board-to-board communication for larger networks
 
 The flexibility of input and output channels lends to their use in connecting multiple devices together for use as part of a larger simulation engine.
 This would allow networks to be simulated that consume more resources than are available on a single device, which may in turn allow
 for ``grids'' of inexpensive hardware devices to be used to simulate a very large model.
-\item increase design size by using off-chip memory (DDR3)
-\item better network stack to allow control and I/O over common protocols e.g. UDP
 
 The current control and I/O interface communicates over Ethernet, but since bare frames are being used with no higher-level protocols on top of them,
 it is somewhat cumbersome to set up a computer or other device to send and receive data to the hardware.
@@ -487,6 +541,24 @@ This approach is suitable for testing and prototyping, but it makes certain assu
 may not be reasonable for general use, such as requiring raw socket privileges on the host operating system (which typically require administrator access).
 A more user-friendly approach would be to implement an Ethernet stack that supports a protocol such as UDP, which can be readily used by many different
 kinds of host software in order to interact with a simulation.
-\end{itemize}
+
+At present, the interconnect between the encoders and the decoded value
+buffers is the most complex part of the design in terms of the density of its logic
+in hardware. If there are $N$ encoders and $M$ decoded value buffers, a total of
+$NM$ connections must be made between these components in order for every
+encoder to be able to read from every decoded value buffer.
+Note that this is still a massive improvement over a neuron-to-neuron interconnect,
+which would require over 10000 times as many connections to provide all-to-all connectivity.
+% FIXME contrast this with size of neuron-to-neuron interconnect
+For large numbers
+of encoders and decoded value buffers, the complexity of the interconnect at
+that design size makes it impossible for the FPGA design tools to find a way to
+implement that part of the design on the device. This is currently the limiting
+factor in terms of the number of population units that can be implemented on
+the development board (as opposed to, for example, a lack of memory blocks for
+decoded value buffers). A future version of the \design{} design may address
+this issue and implement an interconnect that scales well to larger numbers of
+encoders and decoded value buffers in order to allow more populations to be
+simulated. % FIXME how could this be done?
 
 \end{document}
