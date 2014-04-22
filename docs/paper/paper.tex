@@ -48,8 +48,9 @@ Each population unit performs time-multiplexing and swaps in different sets of d
 in order to run more populations on the same hardware. The principal components are fixed and must be shared
 between all populations on an individual population unit.
 Each population unit writes to a fixed set of decoded value buffers, but a shared interconnect
-allows the encoder units to perform random accesses to these buffers, which allows
-inputs to a population to come from any combination of decoded values. % FIXME more detail
+allows the encoder units to perform random accesses to these buffers.
+This allows effective all-to-all communication between populations while reducing the number of 
+connections that must be made between population units.
 A number of decoded value buffers are reserved for external inputs to the network,
 which can be sent from the controlling computer system over an Ethernet connection.
 The output channels can also be programmed to send decoded values back to the computer over Ethernet.
@@ -98,18 +99,14 @@ Encoded values are passed from the encoder units to the population units.
 Population units are either one-dimensional or two-dimensional.
 This means the groups of neurons they model have firing rates that are static functions of either a one- or two-dimensional represented variable.
 Both types of population unit receive input from two encoder units in each input dimension;
-for each dimension, the encoded values are passed through a first-order filter which performs post-synaptic filtering, % FIXME check this
-and then summed. The value resulting from this operation is
+for each dimension, the encoded values are passed through a first-order filter which performs post-synaptic filtering,
+and are then summed. The value resulting from this operation is
 truncated to the most significant 10 bits and is then used as input to a set of lookup tables,
 implemented as a bank of synchronous RAM elements. SRAMs are used
 because the contents of these tables are not known until simulation-time and therefore the lookups cannot be implemented as hardware logic functions.
 Each lookup table contains the 12-bit fixed-point values of points sampled from 
-%the principal components shared by all populations of neurons
-%simulated on that population unit. 
 principal components of the spike rates of neurons in a population, as a function of the variable that the population encodes.
-As described further below
-%(Section FIXME)
-, all populations on a population unit must share principal components.
+In order to reduce the amount of memory used by each population, all populations on a population unit must share principal components.
 For one-dimensional population units, there are seven such lookup tables, and each one contains
 1024 values sampled at equally-spaced points on the open interval $(-2, 2)$. For two-dimensional population units,
 there are fifteen lookup tables, each containing 1024 values sampled at equally-spaced points on a square of width 4
@@ -143,10 +140,19 @@ previous timestep, and a write-only interface, accessed by the population units 
 Internally, each interface is connected to a separate dual-port RAM; the connections are swapped between RAMs
 at the end of each timestep in order to implement double-buffering, so that it is not possible for encoders to read a
 partially-updated set of decoded values, where some are from the previous timestep and some are freshly written during the current timestep.
+A diagram of this component is shown in Figure~\ref{fig:dvdoublebuffer}.
 The reason for choosing a size of 2048 is because of this implementation detail; on the particular family of hardware
 that was used to implement the prototype, the largest single-component 12-bit dual-port RAM available has space for 1024 words,
 and two separate RAM components are necessary in order to implement the double buffer, hence a total size of 2048 words of memory.
-% FIXME DV double buffer diagram in here somewhere
+
+\begin{figure}
+\centering
+
+\includegraphics[width=6.0in]{dv-double-buffer-diagram.eps}
+
+\caption{Block diagram of the decoded value double-buffer component.}
+\label{fig:dvdoublebuffer}
+\end{figure}
 
 The encoders must share access to the read-only interface of the decoded value buffers. To accomplish this,
 the encoders are connected to the decoded value buffers over a shared interconnect. Access to the decoded value buffers
