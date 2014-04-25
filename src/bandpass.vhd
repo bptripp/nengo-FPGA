@@ -62,11 +62,17 @@ begin
 
 COMB: process(reg, valid, u)
 	variable ci : ci_type;
-	constant a1 : sfixed (1 downto -14) := to_sfixed(0.5916, 1,-14);
-	constant a2 : sfixed (1 downto -14) := to_sfixed(-0.5289, 1,-14);
-	constant c1 : sfixed (1 downto -14) := to_sfixed(0.4643, 1,-14);
-	constant c2 : sfixed (1 downto -14) := to_sfixed(-1.1970, 1,-14);
-	constant d : sfixed (1 downto -14) := to_sfixed(0.7848, 1,-14);
+	--constant a1 : sfixed (1 downto -14) := to_sfixed(0.5916, 1,-14);
+	--constant a2 : sfixed (1 downto -14) := to_sfixed(-0.5289, 1,-14);
+	--constant c1 : sfixed (1 downto -14) := to_sfixed(0.4643, 1,-14);
+	--constant c2 : sfixed (1 downto -14) := to_sfixed(-1.1970, 1,-14);
+	--constant d : sfixed (1 downto -14) := to_sfixed(0.7848, 1,-14);
+	
+	constant a1 : sfixed (1 downto -14) := to_sfixed(0.3791, 1,-14);
+	constant a2 : sfixed (1 downto -14) := to_sfixed(-0.0221, 1,-14);
+	constant c1 : sfixed (1 downto -14) := to_sfixed(-0.4512, 1,-14);
+	constant c2 : sfixed (1 downto -14) := to_sfixed(-0.1690, 1,-14);
+	constant d : sfixed (1 downto -14) := to_sfixed(1.0, 1,-14);
 begin
 	ci := reg;
 	if(valid = '1') then
