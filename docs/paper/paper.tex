@@ -384,7 +384,7 @@ p2 = nengo.Probe(A, 'decoded_output', filter=0.01)
 The network was compiled with the \design{} backend to produce a programming file that could be used to configure the simulator hardware.
 Simulation output from the FPGA was captured with an Ethernet traffic sniffer and plotted in Figure~\ref{fig:integrator1d}.
 
-\begin{figure}
+\begin{figure}[h!]
 \centering
 
 \begin{subfigure}[a]{0.4\textwidth}
@@ -553,16 +553,16 @@ Simulation of this network in hardware produced results comparable to those obta
 
 % FIXME change the bounds on the axes to make it easier to see the similarities
 
-\begin{subfigure}[b]{0.5\textwidth}
+\begin{subfigure}[b]{0.4\textwidth}
 \centering
-\includegraphics[width=3in]{multiplier-sw.eps}
+\includegraphics[width=4in]{multiplier-sw.eps}
 \caption{Software}
 \label{fig:multiplier:sw}
 \end{subfigure}
 
-\begin{subfigure}[b]{0.5\textwidth}
+\begin{subfigure}[b]{0.4\textwidth}
 \centering
-\includegraphics[width=3in]{multiplier.eps}
+\includegraphics[width=4in]{multiplier.eps}
 \caption{Hardware}
 \label{fig:multiplier:hw}
 \end{subfigure}
