@@ -387,11 +387,22 @@ Simulation output from the FPGA was captured with an Ethernet traffic sniffer an
 \begin{figure}
 \centering
 
-\includegraphics[width=6in]{integrator-1d.eps} % FIXME software plot
+\begin{subfigure}[a]{0.4\textwidth}
+\includegraphics[width=4in]{integrator-1d.eps}
+\caption{Hardware simulation}
+\label{fig:integrator1d:hw}
+\end{subfigure}
+
+\begin{subfigure}[b]{0.4\textwidth}
+\includegraphics[width=4in]{integrator-1d-sw.eps}
+\caption{Software simulation}
+\label{fig:integrator1d:sw}
+\end{subfigure}
+
 % FIXME figure: larger axis and label font, make this consistent across all figures
 
 \caption[Simulation of a 1D neural integrator.]
-{Hardware output from simulation of a one-dimensional population representing a neural integrator.}
+{Hardware (\ref{fig:integrator1d:hw}) and software (\ref{fig:integrator1d:sw}) output from simulation of a one-dimensional population representing a neural integrator.}
 
 \label{fig:integrator1d}
 \end{figure}
