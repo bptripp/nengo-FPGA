@@ -123,8 +123,8 @@ y = x.transpose()
 
 # RF parameters ... 
 gabor_centres = np.linspace(-150, 150, 4)
-gabor_angles = np.linspace(0, np.pi, 4)
-gabor_phases = np.linspace(0, np.pi, 4)
+gabor_angles = np.linspace(0, np.pi-(np.pi/4), 4)
+gabor_phases = np.linspace(0, 2*np.pi-(np.pi/2), 4)
 dog_centres = range(-195, 200, 5) #make matrix reasonable size by using DOGs centred every few pixels
 dog_inner_sigma = 6 #for difference-of-gaussians
 gabor_frequency = 2*np.pi/32
