@@ -6,15 +6,15 @@ import cPickle as pickle
 def make_DOG(inner_sigma, x): 
     """ Make a 1D difference-of-Gaussians kernel. """
     outer_sigma = inner_sigma*4
-    inner_gaussian = 1/np.sqrt(2*np.pi)/inner_sigma * np.exp(-x**2/2/inner_sigma**2)
-    outer_gaussian = 1/np.sqrt(2*np.pi)/outer_sigma * np.exp(-x**2/2/outer_sigma**2)
+    inner_gaussian = 1./np.sqrt(2*np.pi)/inner_sigma * np.exp(-x**2/2./inner_sigma**2)
+    outer_gaussian = 1./np.sqrt(2*np.pi)/outer_sigma * np.exp(-x**2/2./outer_sigma**2)
     return inner_gaussian - outer_gaussian
 
 def make_DOG2D(inner_sigma, x, y, centre):
     """ Make a 2D difference-of-Gaussians kernel. """
     outer_sigma = inner_sigma*4
-    inner_gaussian = 1/(2*np.pi*inner_sigma**2) * np.exp(-((x-centre[0])**2 + (y-centre[1])**2)/2/inner_sigma**2)
-    outer_gaussian = 1/(2*np.pi*outer_sigma**2) * np.exp(-((x-centre[0])**2 + (y-centre[1])**2)/2/outer_sigma**2)
+    inner_gaussian = 1./(2*np.pi*inner_sigma**2) * np.exp(-((x-centre[0])**2 + (y-centre[1])**2)/2/inner_sigma**2)
+    outer_gaussian = 1./(2*np.pi*outer_sigma**2) * np.exp(-((x-centre[0])**2 + (y-centre[1])**2)/2/outer_sigma**2)
     return inner_gaussian - outer_gaussian
 
 def make_gabor(x, y, centre, frequency, phase, sigma, angle): 
@@ -23,7 +23,7 @@ def make_gabor(x, y, centre, frequency, phase, sigma, angle):
     yy = x*np.sin(angle) + y*np.cos(angle)
     xx = xx-centre[0]
     yy = yy-centre[1]
-    return np.sin(frequency*xx + phase) * np.exp(-xx**2/2/sigma[0]**2 -yy**2/2/sigma[1]**2)
+    return np.cos(frequency*xx + phase) * np.exp(-xx**2/2/sigma[0]**2 -yy**2/2/sigma[1]**2)
 
 #Assuming frame rate of 100Hz (will sample-and-hold for 1000Hz neural simulation)  
 def make_dots(n_frames, coherence=0.5, speed=0.1, direction=180):
@@ -49,10 +49,10 @@ def make_dots(n_frames, coherence=0.5, speed=0.1, direction=180):
         )
 
     dots = visual.DotStim(win=win, name='dots',units='deg', 
-        nDots=200, dotSize=5,
+        nDots=15, dotSize=5,
         speed=speed, dir=direction, coherence=coherence,
         fieldPos=[0.0, 0.0], fieldSize=10,fieldShape='circle',
-        signalDots='same', noiseDots='direction',dotLife=3,
+        signalDots='same', noiseDots='position',dotLife=10,
         color=[1.0,1.0,1.0], colorSpace='rgb', opacity=1, depth=-1.0)
 
     for frameN in range(n_frames):
@@ -112,7 +112,7 @@ def make_gabors(centres, angles, phases, frequency, sigma, x, y):
 def dog_to_gabor_weights(DOGs, gabors):
     """ Find weights for combining DOG receptive fields into a set of Gabors in LGN-V1 projection."""
     gamma = np.dot(DOGs.T, DOGs)
-    inv_gamma = np.linalg.pinv(gamma)
+    inv_gamma = np.linalg.pinv(gamma, 1e-1) #was low but responses don't reflect gabors well 
     weights = np.dot(inv_gamma, np.dot(DOGs.T, gabors))
     return weights
 
@@ -121,10 +121,13 @@ ind = range(-200, 201, 2) #image vectors are pretty big without subsampling
 x = np.tile(ind, (len(ind), 1))
 y = x.transpose()
 
-# RF parameters ... 
-gabor_centres = np.linspace(-150, 150, 4)
-gabor_angles = np.linspace(0, np.pi-(np.pi/4), 4)
-gabor_phases = np.linspace(0, 2*np.pi-(np.pi/2), 4)
+# RF parameters ...
+gabor_centres = range(-20, 30, 10) #small scale for spiking / FPGA comparison
+#gabor_centres = range(-190, 200, 10) #full scale for FPGA only
+
+gabor_angles = [0.] #just sense left/right motion, no other angles
+gabor_phases = [-np.pi/2, 0, np.pi/2]
+
 dog_centres = range(-195, 200, 5) #make matrix reasonable size by using DOGs centred every few pixels
 dog_inner_sigma = 6 #for difference-of-gaussians
 gabor_frequency = 2*np.pi/32
@@ -133,11 +136,15 @@ gabor_sigma = (10,20)
 # find weights to approximate Gabor RFs from difference-of-gaussian RFs ... 
 DOGs = make_DOGs(dog_inner_sigma, dog_centres, x, y)
 gabors = make_gabors(gabor_centres, gabor_angles, gabor_phases, gabor_frequency, gabor_sigma, x, y)
-weights = dog_to_gabor_weights(DOGs, gabors);
+weights = dog_to_gabor_weights(DOGs, gabors)
 
 # make dot stimulus and associated V1 inputs ... 
-n_frames = 10
-dot_images = make_dots(n_frames, coherence=0.5, speed=0.1, direction=180)
+#n_frames = 100
+#dot_images = make_dots(n_frames, coherence=0.5, speed=0.03, direction=180)
+#pickle.dump(dot_images, open("dot-images.p", "wb"))
+dot_images = pickle.load(open("dot-images-15.p", "rb" ))
+n_frames = dot_images.shape[2]
+
 sample_hold_ratio = 10 #number of neural simulation samples per stimulus frame
 im_size = dot_images.shape[0:2]
 dog_indices = (np.array(dog_centres) + 200).tolist()
@@ -165,4 +172,4 @@ for frame_num in range(n_frames):
             
         dd_prev = dd2
         
-pickle.dump(V1, open("LGN-V1.p", "wb"))
+pickle.dump(V1, open("LGN-V1-small-15-reg.p", "wb"))
