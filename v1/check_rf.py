@@ -5,8 +5,8 @@ import numpy as np
 from scipy import ndimage as nd
 import matplotlib.pyplot as plt
 
-#probe dot centres ... 
-dot_ind = range(-196, 197, 2) #don't probe edges
+#define centres of probe dots ... 
+dot_ind = range(-26, 27, 2) #just probe central region (expect RF at centre)
 dotx = np.tile(dot_ind, (len(dot_ind), 1))
 doty = dotx.transpose()
 dotx_list = np.ndarray.flatten(dotx)
@@ -16,7 +16,6 @@ img_ind = range(-200, 200, 1)
 imgx = np.tile(img_ind, (len(img_ind), 1))
 imgy = imgx.transpose()
 
-dd_prev = np.zeros_like(imgx)
 LGN = np.zeros_like(imgx)
 threshold = 0.5
 V1_RF = np.zeros_like(dotx)
@@ -33,8 +32,10 @@ for i in range(len(dotx_list)):
     dd1 = nd.filters.convolve1d(img, DOG, axis=0)    
     dd2 = nd.filters.convolve1d(dd1, DOG, axis=1)
 
-    LGN[dd2 > threshold] = 1    
+    #LGN = np.zeros_like(imgx)
+    #LGN[dd2 > threshold] = 1
+    LGN = dd2
     LGN_out = LGN.take(dog_indices, axis=0).take(dog_indices, axis=1)
     V1 = np.dot(np.reshape(LGN_out, (1,-1)), weights)
-    V1_RF[dotx_list[i], doty_list[i]] = V1[0][0]
+    V1_RF[dotx_list[i], doty_list[i]] = V1[0][1]
     

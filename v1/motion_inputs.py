@@ -23,7 +23,7 @@ def make_gabor(x, y, centre, frequency, phase, sigma, angle):
     yy = x*np.sin(angle) + y*np.cos(angle)
     xx = xx-centre[0]
     yy = yy-centre[1]
-    return np.cos(frequency*xx + phase) * np.exp(-xx**2/2/sigma[0]**2 -yy**2/2/sigma[1]**2)
+    return np.cos(frequency*xx + phase) * np.exp(-xx**2/2./sigma[0]**2 -yy**2/2./sigma[1]**2)
 
 #Assuming frame rate of 100Hz (will sample-and-hold for 1000Hz neural simulation)  
 def make_dots(n_frames, coherence=0.5, speed=0.1, direction=180):
@@ -112,7 +112,7 @@ def make_gabors(centres, angles, phases, frequency, sigma, x, y):
 def dog_to_gabor_weights(DOGs, gabors):
     """ Find weights for combining DOG receptive fields into a set of Gabors in LGN-V1 projection."""
     gamma = np.dot(DOGs.T, DOGs)
-    inv_gamma = np.linalg.pinv(gamma, 1e-1) #was low but responses don't reflect gabors well 
+    inv_gamma = np.linalg.pinv(gamma, 1e-3) #was low but responses don't reflect gabors well 
     weights = np.dot(inv_gamma, np.dot(DOGs.T, gabors))
     return weights
 
@@ -122,54 +122,77 @@ x = np.tile(ind, (len(ind), 1))
 y = x.transpose()
 
 # RF parameters ...
-gabor_centres = range(-20, 30, 10) #small scale for spiking / FPGA comparison
+gabor_centres = 0 #small scale for spiking / FPGA comparison
 #gabor_centres = range(-190, 200, 10) #full scale for FPGA only
 
 gabor_angles = [0.] #just sense left/right motion, no other angles
 gabor_phases = [-np.pi/2, 0, np.pi/2]
 
-dog_centres = range(-195, 200, 5) #make matrix reasonable size by using DOGs centred every few pixels
+inc = 5
+dog_centres = np.array(range(-195, 200, inc)) #make matrix reasonable size by using DOGs centred every few pixels
 dog_inner_sigma = 6 #for difference-of-gaussians
-gabor_frequency = 2*np.pi/32
+gabor_frequency = 2*np.pi/32 
 gabor_sigma = (10,20)
 
-# find weights to approximate Gabor RFs from difference-of-gaussian RFs ... 
-DOGs = make_DOGs(dog_inner_sigma, dog_centres, x, y)
-gabors = make_gabors(gabor_centres, gabor_angles, gabor_phases, gabor_frequency, gabor_sigma, x, y)
-weights = dog_to_gabor_weights(DOGs, gabors)
+# solve for weights in a local neighbourhood, then tile
+dog_centres_local = np.array(range(-25, 30, inc))
+DOGs_local = make_DOGs(dog_inner_sigma, dog_centres_local, x, y)
+gabors_local = make_gabors([0], gabor_angles, gabor_phases, gabor_frequency, gabor_sigma, x, y)
+weights_local = dog_to_gabor_weights(DOGs_local, gabors_local)
+nl = weights_local.shape[1]
 
-# make dot stimulus and associated V1 inputs ... 
-#n_frames = 100
-#dot_images = make_dots(n_frames, coherence=0.5, speed=0.03, direction=180)
-#pickle.dump(dot_images, open("dot-images.p", "wb"))
-dot_images = pickle.load(open("dot-images-15.p", "rb" ))
-n_frames = dot_images.shape[2]
+#tile_offsets = range(-170, 175, 5)
+tile_offsets = [0]
 
-sample_hold_ratio = 10 #number of neural simulation samples per stimulus frame
-im_size = dot_images.shape[0:2]
-dog_indices = (np.array(dog_centres) + 200).tolist()
-DOG = make_DOG(dog_inner_sigma, np.arange(-75,75)) #1D for faster image convolution (the 2D kernel is separable)
-LGN = np.zeros((im_size[0], im_size[1], n_frames*sample_hold_ratio))
-V1 = np.zeros((gabors.shape[1], n_frames*sample_hold_ratio))
-threshold = 0.5
-
-dd_prev = np.zeros(im_size)
-for frame_num in range(n_frames): 
-    dd1 = nd.filters.convolve1d(dot_images[:,:,frame_num], DOG, axis=0)    
-    dd2 = nd.filters.convolve1d(dd1, DOG, axis=1)
-
-    for step_num in range(sample_hold_ratio): 
-        threshold_crossings = np.logical_and(dd2 > dd_prev, dd2 > threshold)
-        ind = frame_num*sample_hold_ratio+step_num
-
-        LGN[threshold_crossings,ind] = 1
-        if ind < n_frames*sample_hold_ratio-1: #Aziz uses a 2-ms burst at each threshold crossing
-            LGN[threshold_crossings,ind+1] = 1
-        
-        LGN_ind = LGN[:,:,ind]
-        LGN_out = LGN_ind.take(dog_indices, axis=0).take(dog_indices, axis=1)
-        V1[:,ind] = np.dot(np.reshape(LGN_out, (1,-1)), weights)
-            
-        dd_prev = dd2
-        
-pickle.dump(V1, open("LGN-V1-small-15-reg.p", "wb"))
+##weights = np.zeros((len(dog_centres)**2, nl*len(tile_offsets)**2))
+##for i in range(len(tile_offsets)):
+##    for j in range(len(tile_offsets)):
+##        xmask = np.abs(dog_centres-tile_offsets[i]) <= 25
+##        ymask = np.abs(dog_centres-tile_offsets[j]) <= 25
+##        mask = np.reshape(np.outer(ymask.T, xmask), -1)
+##        ind = np.arange(0,nl) + j*nl + i*len(tile_offsets)*nl
+##        for k in range(len(ind)): 
+##            weights[mask,ind[k]] = weights_local[:,k]
+##
+### find weights to approximate Gabor RFs from difference-of-gaussian RFs ... 
+###DOGs = make_DOGs(dog_inner_sigma, dog_centres, x, y)
+###gabors = gabors_local
+###gabors = make_gabors(gabor_centres, gabor_angles, gabor_phases, gabor_frequency, gabor_sigma, x, y)
+###weights = dog_to_gabor_weights(DOGs, gabors)
+##
+##
+### make dot stimulus and associated V1 inputs ... 
+###n_frames = 100
+###dot_images = make_dots(n_frames, coherence=0.5, speed=0.03, direction=180)
+###pickle.dump(dot_images, open("dot-images.p", "wb"))
+##dot_images = pickle.load(open("dot-images-15.p", "rb" ))
+##n_frames = dot_images.shape[2]
+##
+##sample_hold_ratio = 10 #number of neural simulation samples per stimulus frame
+##im_size = dot_images.shape[0:2]
+##dog_indices = (np.array(dog_centres) + 200).tolist()
+##DOG = make_DOG(dog_inner_sigma, np.arange(-75,75)) #1D for faster image convolution (the 2D kernel is separable)
+##LGN = np.zeros((im_size[0], im_size[1], n_frames*sample_hold_ratio))
+##V1 = np.zeros((gabors.shape[1], n_frames*sample_hold_ratio))
+##threshold = 0.5
+##
+##dd_prev = np.zeros(im_size)
+##for frame_num in range(n_frames): 
+##    dd1 = nd.filters.convolve1d(dot_images[:,:,frame_num], DOG, axis=0)    
+##    dd2 = nd.filters.convolve1d(dd1, DOG, axis=1)
+##
+##    for step_num in range(sample_hold_ratio): 
+##        threshold_crossings = np.logical_and(dd2 > dd_prev, dd2 > threshold)
+##        ind = frame_num*sample_hold_ratio+step_num
+##
+##        LGN[threshold_crossings,ind] = 1
+##        if ind < n_frames*sample_hold_ratio-1: #Aziz uses a 2-ms burst at each threshold crossing
+##            LGN[threshold_crossings,ind+1] = 1
+##        
+##        LGN_ind = LGN[:,:,ind]
+##        LGN_out = LGN_ind.take(dog_indices, axis=0).take(dog_indices, axis=1)
+##        V1[:,ind] = np.dot(np.reshape(LGN_out, (1,-1)), weights)
+##            
+##        dd_prev = dd2
+##        
+##pickle.dump(V1, open("LGN-V1-small-15-reg.p", "wb"))
