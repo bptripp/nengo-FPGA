@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+
+<target name="1D/2D Board">
+  <board name="VC707" 
+	 dv_count="7" input_dv_count="1" first_input_dv_index="192"
+	 population_1d_count="1" population_2d_count="1">
+	 <output name="ethernet_out" index="0"
+		 first_dv_index="0" last_dv_index="192"
+		 />
+	 <input name="ethernet_in" index="0"
+		first_dv_index="192" last_dv_index="192"
+		/>
+	 <control type="ethernet" mac_address="000A35028FC0" device="eth1" />
+	 <io type="ethernet" input="ethernet_in" output="ethernet_out" 
+	     mac_address="000A35028FC0" device="eth1" />
+  </board>
+</target>
