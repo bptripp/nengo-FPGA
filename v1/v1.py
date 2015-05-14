@@ -219,13 +219,24 @@ def get_default_inputs():
 #     filtered = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-filtered-dots.p", "rb" ))
     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-new-2.p", "rb" ))
     filtered = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-filtered-dots-new.p", "rb" ))
-    centres = np.array([[200,200]]) 
+    
+    c = np.arange(87, 313, 25)
+    centres = np.zeros((c.size**2,2), dtype='int')
+    for i in range(c.size): 
+        for j in range(c.size): 
+            centres[i*c.size+j,0] = c[i]
+            centres[i*c.size+j,1] = c[j]
+    
+    print(centres)
+    
+#     centres = np.array([[200,200]]) 
     return get_inputs(w_kernel, filtered, centres)
 
 
 # get_default_weights()
 
 inputs = get_default_inputs()
+pickle.dump(inputs, open("/Users/bptripp/code/nengo-FPGA/v1/inputs.p", "wb" ))
 # inputs = pure_gabor()
 plt.plot(inputs[0,0,:]-10, 'r')
 plt.plot(inputs[0,1,:], 'g')
