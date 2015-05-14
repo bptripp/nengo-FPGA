@@ -30,6 +30,7 @@
 
 \begin{abstract}
 abstract goes here - bryan???
+- ??? I think we want spiking neuron and population model simulation comparisons for the software simulations when comparing to hardware
 \end{abstract}
 
 \section{Introduction}
@@ -602,7 +603,7 @@ transfers the configuration data to the hardware and controls input and output d
 % clustering algorithm, quantization error for large populations -- this needs its own section
 
 \section{Results}
-
+- ??? Schematics could come from the Nengo visualizer, for consistency and ease.
 % integrator (1d)
 % oscillator (2d)
 % feed-forward nonlinear functions
@@ -851,6 +852,11 @@ simulation of a neural multiplier network.}
 \label{fig:multiplier}
 \end{figure}
 
+\section{Large-scale simulation}
+
+- Bryan??? Describe the V1 model, simulate it and show results... big as possible
+
+
 \section{Discussion}
 
 \subsection{How well it worked}
@@ -884,7 +890,6 @@ setting the second element of each neuron's encoder to -1, and connecting inhibi
 
 \subsection{Future work \& extensions}
 
-
 The flexibility of input and output channels lends to their use in connecting multiple devices together for use as part of a larger simulation engine.
 This would allow networks to be simulated that consume more resources than are available on a single device, which may in turn allow
 for ``grids'' of inexpensive hardware devices to be used to simulate a very large model.
@@ -912,6 +917,10 @@ decoded value buffers). A future version of the \design{} design may address
 this issue and implement an interconnect that scales well to larger numbers of
 encoders and decoded value buffers in order to allow more populations to be
 simulated. % FIXME how could this be done?
+
+\subsection{Conclusion}
+
+- Bryan???
 
 \bibliographystyle{acm}
 \bibliography{references}
