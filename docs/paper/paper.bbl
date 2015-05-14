@@ -1,0 +1,169 @@
+\begin{thebibliography}{10}
+
+\bibitem{Bekolay2014}
+{\sc Bekolay, T., Bergstra, J., Hunsberger, E., Dewolf, T., Stewart, T.~C.,
+  Rasmussen, D., Choo, X., Voelker, A.~R., and Eliasmith, C.}
+\newblock {Nengo: a Python tool for building large-scale functional brain
+  models.}
+\newblock {\em Frontiers in neuroinformatics 7\/} (Jan. 2014), 48.
+
+\bibitem{bekolay2013}
+{\sc Bekolay, T., Kolbeck, C., and Eliasmith, C.}
+\newblock {Simultaneous unsupervised and supervised learning of cognitive
+  functions in biologically plausible spiking neural networks}.
+\newblock In {\em 35th Annual Conference of the Cognitive Science Society\/}
+  (2013), Cognitive Science Society, pp.~169--174.
+
+\bibitem{Conklin2005b}
+{\sc Conklin, J., and Eliasmith, C.}
+\newblock {An attractor network model of path integration in the rat}.
+\newblock {\em Journal of Computational Neuroscience 18\/} (2005), 183--203.
+
+\bibitem{Dewolf}
+{\sc Dewolf, T., and Eliasmith, C.}
+\newblock {The neural optimal control hierarchy for motor control}.
+\newblock {\em Neural Engineering 8}, 6 (2011), 21.
+
+\bibitem{Eliasmith2003f}
+{\sc Eliasmith, C.}
+\newblock {Neural engineering: Unraveling the comlexities of neural systems}.
+\newblock {\em IEEE Canadian Review 43\/} (2003), 13--15.
+
+\bibitem{Eliasmith2005p}
+{\sc Eliasmith, C.}
+\newblock {A unified approach to building and controlling spiking attractor
+  networks}.
+\newblock {\em Neural computation 17}, 6 (2005), 1276--1314.
+
+\bibitem{Eliasmith1999s}
+{\sc Eliasmith, C., and Anderson, C.~H.}
+\newblock {Developing and applying a toolkit from a general neurocomputational
+  framework}.
+\newblock {\em Neurocomputing 26\/} (1999), 1013--1018.
+
+\bibitem{Eliasmith2003m}
+{\sc Eliasmith, C., and Anderson, C.~H.}
+\newblock {\em {Neural engineering: Computation, representation and dynamics in
+  neurobiological systems}}.
+\newblock MIT Press, Cambridge, MA, 2003.
+
+\bibitem{Eliasmith2012b}
+{\sc Eliasmith, C., Stewart, T.~C., Choo, X., Bekolay, T., DeWolf, T., Tang,
+  Y., and Rasmussen, D.}
+\newblock {A large-scale model of the functioning brain}.
+\newblock {\em Science 338\/} (2012), 1202--1205.
+
+\bibitem{Fischer2009w}
+{\sc Fischer, B.~J., Pe\~{n}a, J.~L., and Konishi, M.}
+\newblock {Emergence of multiplicative auditory responses in the midbrain of
+  the barn owl.}
+\newblock {\em Journal of neurophysiology 98}, 3 (Sept. 2007), 1181--93.
+
+\bibitem{Georgopoulos1989q}
+{\sc Georgopoulos, A.~P., Lurito, J.~T., Petrides, M., Schwartz, A., and
+  Massey, J.}
+\newblock {Mental rotation of the neuronal population vector}.
+\newblock {\em Science 243\/} (1989), 234--236.
+
+\bibitem{jaeger2001}
+{\sc H., J.}
+\newblock {The "echo state" approach to analysing and training recurrent neural
+  networks}.
+\newblock Tech. rep., GMD Report 148 - GMD German National Research Institute
+  for Computer Science, 2001.
+
+\bibitem{jonas1993quantal}
+{\sc Jonas, P., Major, G., and Sakmann, B.}
+\newblock {Quantal components of unitary EPSCs at the mossy fibre synapse on
+  CA3 pyramidal cells of rat hippocampus.}
+\newblock {\em The Journal of Physiology 472}, 1 (1993), 615--663.
+
+\bibitem{Laubach2010}
+{\sc Laubach, M., Caetano, M.~S., Liu, B., Smith, N.~J., Narayanan, N.~S., and
+  Eliasmith, C.}
+\newblock {Neural circuits for persistent activity in medial prefrontal
+  cortex}.
+\newblock In {\em Society for Neuroscience Abstracts\/} (2010), p.~200.18.
+
+\bibitem{Litt2008u}
+{\sc Litt, A., Eliasmith, C., and Thagard, P.}
+\newblock {Neural affective decision theory: Choices, brains, and emotions}.
+\newblock {\em Cognitive Systems Research 9\/} (2008), 252--273.
+
+\bibitem{Liu2011}
+{\sc Liu, B., Caetano, M., Narayanan, N., Eliasmith, C., and Laubach, M.}
+\newblock {A neuronal mechanism for linking actions to outcomes in the medial
+  prefrontal cortex}.
+\newblock In {\em Computational and Systems Neuroscience 2011\/} (2011).
+
+\bibitem{Maass2002}
+{\sc Maass, W., Natschl$\backslash$$\backslash$"ager, T., and Markram, H.}
+\newblock {Real-time computing without stable states: A new framework for
+  neural computation based on perturbations}.
+\newblock {\em Neural computation 14}, 11 (2002), 2531--2560.
+
+\bibitem{MacNeil2011a}
+{\sc MacNeil, D., and Eliasmith, C.}
+\newblock {Fine-Tuning and the Stability of Recurrent Neural Networks}.
+\newblock {\em PLoS ONE 6}, 9 (Sept. 2011), e22885.
+
+\bibitem{Parisien2008c}
+{\sc Parisien, C., Anderson, C.~H., and Eliasmith, C.}
+\newblock {Solving the problem of negative synaptic weights in cortical
+  models}.
+\newblock {\em Neural Computation 20\/} (2008), 1473--1494.
+
+\bibitem{Rieke1997b}
+{\sc Rieke, F., Warland, D., {de Ruyter van Steveninick}, R., and Bialek, W.}
+\newblock {\em {Spikes: Exploring the neural code}}.
+\newblock MIT Press, Cambridge, MA, 1997.
+
+\bibitem{Rust2006}
+{\sc Rust, N.~C., Mante, V., Simoncelli, E.~P., and Movshon, J.~A.}
+\newblock {How MT cells analyze the motion of visual patterns.}
+\newblock {\em Nature neuroscience 9}, 11 (Nov. 2006), 1421--31.
+
+\bibitem{sah1990properties}
+{\sc Sah, P., Hestrin, S., and Nicoll, R.~A.}
+\newblock {Properties of excitatory postsynaptic currents recorded in vitro
+  from rat hippocampal interneurones.}
+\newblock {\em The Journal of physiology 430}, 1 (1990), 605--616.
+
+\bibitem{Singh2006b}
+{\sc Singh, R., and Eliasmith, C.}
+\newblock {Higher-dimensional neurons explain the tuning and dynamics of
+  working memory cells}.
+\newblock {\em Journal of Neuroscience 26\/} (2006), 3667--3678.
+
+\bibitem{Stewart2014}
+{\sc Stewart, T., and Eliasmith, C.}
+\newblock {Large-Scale Synthesis of Functional Spiking Neural Circuits}.
+\newblock {\em Proceedings of the IEEE 102}, 5 (May 2014), 881--898.
+
+\bibitem{stewart2012b}
+{\sc Stewart, T.~C.}
+\newblock {The Neural Engineering Framework}.
+\newblock {\em AISB Quarterly\/} (2012), 2--7.
+
+\bibitem{Stewart2011a}
+{\sc Stewart, T.~C., Bekolay, T., and Eliasmith, C.}
+\newblock {Neural representations of compositional structures: representing and
+  manipulating vector spaces with spiking neurons}.
+\newblock {\em Connection Science 23}, 2 (June 2011), 145--153.
+
+\bibitem{Stewart2009l}
+{\sc Stewart, T.~C., Tripp, B., and Eliasmith, C.}
+\newblock {Python scripting in the nengo simulator.}
+\newblock {\em Frontiers in neuroinformatics 3\/} (Jan. 2009), 7--16.
+
+\bibitem{tapson2013}
+{\sc Tapson, J., and van Schaik, A.}
+\newblock {Learning the pseudo inverse solution to network weights}.
+\newblock {\em Neural Networks 45\/} (2013), 94--100.
+
+\bibitem{Taube2007}
+{\sc Taube, J.~S.}
+\newblock {The head direction signal: origins and sensory-motor integration.}
+\newblock {\em Annual review of neuroscience 30\/} (Jan. 2007), 181--207.
+
+\end{thebibliography}

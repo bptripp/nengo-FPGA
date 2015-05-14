@@ -6,6 +6,9 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{listings}
+\usepackage{authblk}
+\usepackage{amsmath}
+
 
 \newcommand{\design}{Nengo-RT}
 
@@ -13,19 +16,331 @@
 
 \lstset{basicstyle=\footnotesize}
 
+\title{Large-scale neural circuits on an FPGA}
+
+\author[1]{Murphy Berzish}
+\author[1,2,3]{Chris Eliasmith}
+\author[1,2]{Bryan Tripp}
+\affil[1]{Centre for Theoretical Neuroscience, University of Waterloo}
+\affil[2]{Dept. of Systems Design Engineering, University of Waterloo}
+\affil[3]{Dept. of Philosophy, University of Waterloo}
+\maketitle
+
+\abstract{abstract goes here - bryan???}
+
 \section{Introduction}
+
+
 
 \subsection{Motivation}
 
-\subsection{Potential Applications}
+- potential applications
 
 \subsection{State of the Art (Neuromorphic Hardware)}
 
+- from my other paper for mind collection
+
 \section{Methods}
 
-\subsection{Description of NEF and population mode}
+\subsection{The Neural Engineering Framework}
+
+The Neural Engineering Framework (NEF) is method for constructing biologically realistic neural models \cite{Eliasmith1999s}.  Several overviews of the NEF are available \cite{Eliasmith2003f,Eliasmith2005p,stewart2012b,Eliasmith2012b}, but the description provided here is based on that in \cite{Stewart2014}.   
+The NEF is a general-purpose approach to
+implementing algorithms using components such
+as spiking neurons \cite{Eliasmith2003m}. As a result, the NEF can be thought of
+as a ``neural compiler'' where algorithms characterized by a high-level
+mathematical description are converted into neural networks.
+This compilation process works for arbitrary neuron types, and can
+be constrained in biologically informed ways. Importantly, the high-level
+description must be expressed in terms of vectors and functions on
+those vectors (including differential equations). The resulting
+neural networks approximate the desired functions, and the error of
+this approximation can be made small by increasing the
+number of neurons.
+
+While the NEF can be used to build arbitrary abstract systems such
+as controlled attractor networks \cite{Eliasmith2005p}, we have primarily
+used it to show how particular capabilities found in real animals
+might be implemented biologically. This has included path integration
+in rodents \cite{Conklin2005b}, working memory \cite{Singh2006b}
+and arm movements \cite{Dewolf} in monkeys, and decision-making in
+rats \cite{Laubach2010,Liu2011} and humans \cite{Litt2008u}. We
+have also taken into account biological constraints such as Dale's
+Principle \cite{Parisien2008c} and incorporated biologically realistic
+learning rules to construct these networks \cite{MacNeil2011a,bekolay2013}.
+
+The remainder of this section serves as a summary of the three main principles
+of the NEF. 
+
+\subsection{Principle 1 - Representation}
+
+In the NEF, groups of neurons are taken to represent vectors,
+and connections between groups of neurons compute functions on those
+vectors. The first NEF principle shows how the activity of a group
+of neurons can be said to represent a vector, and how changes in the
+activity of those neurons corresponds to changes in the represented
+vector.
+
+In the brain many neurons have a particular stimulus (or response) for
+which they will fire most strongly. As an input stimulus (or response)
+changes to become less similar to the preferred stimulus, the neuron
+will fire less quickly.  This kind of behaviour was originally identified in the motor
+system \cite{Georgopoulos1989q} and has since been seen in the head
+direction system \cite{Taube2007}, visual system \cite{Rust2006},
+and auditory system \cite{Fischer2009w}. The NEF identifies the preferred stimulus with a ``preferred direction vector'' associated with each neuron.  For a more detailed exploration of this idea, see \cite{Stewart2011a}.
+
+In the NEF, we generalize this concept to all neural populations (those that are stimulus driven and those that are not).
+In particular, we quantify it by stating that the total current going
+into a neuron will be proportional to the dot product of the vector
+to be represented, $\mathbf{x}$, and the preferred direction (or ``encoding'') vector
+for the neuron, $\mathbf{e}_{i}$ (plus a constant bias term). The
+response of a neuron \textbf{$i$} for any given input vector \textbf{$\mathbf{x}$}
+is thus
+
+\begin{equation}
+\delta_{i}(\mathbf{x})=G_{i}[\alpha_{i}\mathbf{e}_{i}\mathbf{x}+J_{i}^{bias}]\label{eq:enc}
+\end{equation}
+where $\delta_{i}$ is the spiking output of the neuron, $G_{i}$
+is the neuron model, $\alpha_{i}$ is a randomly chosen gain term,
+$\mathbf{e}_{i}$ is the preferred direction vector, and $J_{i}^{bias}$
+is a randomly chosen fixed background current. We use $\mathbf{e}$
+for \textit{encoder} to indicate that (\ref{eq:enc}) captures a transformation
+between spaces: \textbf{$\mathbf{x}$} is encoded in the activity
+space of the neurons.  Importantly, the NEF applies
+to a large variety of neuron models (including both spiking and non-spiking
+models) since it makes no commitment to a specific function $G$ (whose
+input is the total current flowing into the neuron). The leaky-integrate-and-fire
+(LIF) model is a common choice, for reasons of computational efficiency, but a wide variety of
+neural models work with the NEF. 
+
+Given an encoding operation, it is natural to define a \textit{decoding} operation,
+in order to characterize the information processing characteristics
+of the system (in this case an ensemble of neurons). To decode a continuous
+estimate of the input from neural activity, the NEF focuses on the
+postsynpatic filtered activity generated by the reception of a spike
+at a synapse. This activity is taken to be a linear filter applied
+to the spiking activity:
+\[
+a_{i}(\mathbf{x})=\sum_{j}h_{i}(t)*\delta_{i}(t-t_{j}(\mathbf{x}))
+\]
+where $h_{i}(t)$ is the synaptic response function (usually a decaying
+exponential) with a time constant, $\tau_{PSC}$, determined by neurotransmitter
+type at the synapse, '$*$' is the convolution operator, and $\delta_{i}(t-t_{j}(\mathbf{x}))$
+is the spike train produced by neuron $i$ in response to input $\mathbf{x}$,
+with spike times indexed by $j$. Having defined this continuous variable,
+which is equal to the spike rate as $\tau_{PSC}\rightarrow\infty$,
+we can specify a decoding operation for estimating the input $\mathbf{x}$.
+
+For reasons that will be apparent in a moment, we use a \textit{linear}
+decoder:
+
+\begin{equation}
+\hat{\mathbf{x}}=\sum_{i}^{N}a_{i}\mathbf{(x)}\mathbf{d}_{i}\label{eq:dec}
+\end{equation}
+where $N$ is the number of neurons in the group, $\mathbf{d}_{i}$
+are the linear decoders, and $\hat{\mathbf{x}}$ is the estimate of
+the original $\mathbf{x}$ value that produced the neural activity
+(\ref{eq:enc}). 
+
+Any optimization method can be used to find these decoders. The simplest
+is to use standard least-squares optimization:
+\begin{equation}
+\underset{\mathbf{d}_{i}}{arg\, min}\int[\mathbf{x}-\sum_{i}^{N}a_{i}(\mathbf{x)}\mathbf{d}_{i}]^{2}d\mathbf{x}\label{eq:error}
+\end{equation}
+where $\mathbf{d}_{i}$ are the decoding vectors over which this error
+is minimized and the integral is over all $\mathbf{x}$ values. It
+has been shown that linear decoders are sufficient to decode \textasciitilde{}95\%
+of the information available in a single spike train generated by
+a stimulus \cite{Rieke1997b}. Furthermore, as the number of neurons
+$N$ increases, the mean squared error decreases as $1/N$. The NEF
+decoding process is depicted in Figure \ref{fig:NEF-decoding}, where
+the optimal linear decoders have been found and used for twenty neurons.
+Temporal decoding is also linear, as described, and is performed using
+the postsynaptic, current-based filters (see section \ref{sub:Principle-3--}
+for further discussion).
+
+While linear decoders are useful for visualizing the information encoded
+within the activity of a group of neurons, they also provide a direct
+way to solve for connection weights between groups of neurons. This
+is a key advantage of the NEF: rather than using a learning rule to
+optimize over the entire space of all connection weights, we instead
+solve the simpler problem of optimizing over the space of linear decoders,
+and then use that result to solve for the connection weights. Importantly,
+given the characterization of neural activity with preferred direction
+vectors, there is no difference between using this smaller space and
+using the equivalent full connection matrix. Interestingly, this general
+technique has started to be applied in broader domains; see \cite{tapson2013}
+for an overview.
+
+For example, if a connection between neural groups is meant to compute
+the identity function $\mathbf{y}=\mathbf{x}$ (where $\mathbf{y}$
+is the vector space represented by the second population B and $\mathbf{x}$
+is the vector space represented by the first population A), the connections
+between individual neurons are given by 
+\begin{equation}
+\omega_{ij}=\alpha_{j}\mathbf{d}_{i}\mathbf{e}_{j}\label{eq:weights}
+\end{equation}
+where $i$ indexes the neurons in group A and $j$ indexes the neurons
+in B. Behavior of this network is shown in Figure \ref{fig:Using-NEF-weights}a. 
+
+While the least-squares method for optimization we use here is not
+biologically plausible on its own, we have also shown that biologically
+realistic learning rules will converge on a similar solution \cite{MacNeil2011a}.
+These realistic rules are, however, several orders of magnitude more
+computationally expensive.
+
+\subsection{Principle 2 - Transformation}
+
+Connections between groups of neurons can also compute functions other
+than the identity function. That is instead of \textbf{$\mathbf{y}=\mathbf{x}$}
+we can do \textbf{$\mathbf{y}=f(\mathbf{x})$}. We do this by finding
+decoders \textbf{$\mathbf{d}_{i}^{f}$ }for the particular function\textbf{
+$f(\mathbf{x})$} by substituting \textbf{$f(\mathbf{x})$ }for $\mathbf{x}$
+in equation (\ref{eq:error}).
+
+\begin{equation}
+\underset{\mathbf{d}_{i}^{f}}{arg\, min}\int[f(\mathbf{x})-\sum_{i}a_{i}(\mathbf{x)}\mathbf{d}_{i}^{f}]^{2}d\mathbf{x}.\label{eq:error-fcns}
+\end{equation}
+
+
+The connection weights can then be computed using (\ref{eq:weights}).
+For the special case of linear functions\textbf{ $\mathbf{y}=\mathbf{L}\mathbf{x}$},
+rather than solving for a new decoder, we can simply put $\mathbf{L}$
+directly into the weight equation itself, resulting in $\omega_{ij}=\alpha_{j}\mathbf{d}_{i}\mathbf{L}\mathbf{e}_{j}$.
+Combining these two approaches, the neural connection weights needed
+to approximate the function\textbf{ $\mathbf{y=L}f(\mathbf{x\textrm{)}}$}
+are:
+\begin{equation}
+\omega_{ij}=\alpha_{j}\mathbf{d}_{i}^{f}\mathbf{L}\mathbf{e}_{j}\label{eq:weights-general}
+\end{equation}
+Figure \ref{fig:Using-NEF-weights}b shows the computation of the
+element-wise square ($f(\mathbf{x})=[x_{1}^{2},x_{2}^{2}]$).
+
+
+\subsection{\label{sub:Principle-3--}Principle 3 - Dynamics}
+
+While the first two principles are sufficient to build neural approximations
+of any desired function of the vector $\mathbf{x}$, the NEF also
+provides a method for computing functions of the form \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}f(\mathbf{x},\mathbf{u})$},
+where $\mathbf{u}$ is the input from some other population. We do
+this by exploiting the fact that neurons do not simply accept input
+as spikes. Rather, when a spike is transmitted from one neuron to
+another, the actual current that flows into the second neuron is a
+low-pass-filtered version of that spike. In particular, the post-synaptic
+current is well-approximated by $h(t)=u(t)e^{-t/\tau}$, where $u(t)$
+is the step function and $\tau$ is the time constant of the neurotransmitter
+used. This time constant varies throughout the brain, e.g., from 2-5
+ms (AMPA; \cite{jonas1993quantal}) up to \textasciitilde{}100ms (NMDA;
+\cite{sah1990properties}). The effect of this filter is that instead
+of a connection computing the function $\mathbf{y}(t)=f(\mathbf{x}(t))$
+it will compute $\mathbf{y}(t)=f(\mathbf{x}(t))*h(t)$ (or, in the
+Laplace domain, $\mathbf{Y}(s)=\mathbf{F}(s)H(s)$).
+
+It turns out that this implicit low-pass filter can be used to generate
+neural models that compute abitrary dynamics. Given a neural population
+representing $\mathbf{x}$, an input $\mathbf{u}(t)$, and a feedback
+connection from $\mathbf{x}$ back to itself computing $g(\mathbf{x}(t))$,
+we note that in the Laplace domain we get $\mathbf{X}(s)=(\mathbf{G}(s)+\mathbf{U}(s))H(s)$.
+Since the Laplace transform of $h(t)=u(t)e^{-t/\tau}$ is $H(s)=1/(1+s\tau)$,
+we can rearrange this to get $s\mathbf{X}(s)=(\mathbf{G}(s)-\mathbf{X}(s))/\tau+\mathbf{U}(s)/\tau$.
+Converting back to the time domain, \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}\frac{g(\mathbf{x}(t))-\mathbf{x}(t)}{\tau}+\frac{\mathbf{u}(t)}{\tau}$}.
+Thus, if we desire the dynamics \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}f(\mathbf{x}(t))+\mathbf{u}(t)$},
+we introduce a feedback connection that uses the previous two NEF
+principles to find connection weights that compute $g(\mathbf{x}(t))=\tau f(\mathbf{x})+\mathbf{x}$
+and we scale the input $\mathbf{u}(t)$ by $\tau$. For arbitrary
+dynamics of the form \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}f(\mathbf{x},\mathbf{u})$},
+we do a change of variables $\mathbf{x}^{\prime}=\langle\mathbf{x},\mathbf{u}\rangle$. 
+
+This exploitation of the inherent first-order low-pass filter found
+in synaptic connections allows for the implementation of a very wide
+variety of systems, including oscillators, integrators, and arbitrary
+attractor networks \cite{Eliasmith2005p}. Figure \ref{fig:Two-dynamical-systems}a
+shows a single neural population with a recurrent feedback connection
+computing the standard linear oscillator \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}[-x_{2},-x_{1}]$}.
+Here, the post-synapic time constant $\tau$ is 100ms, but the period
+of oscillation is $2\pi$ (\textasciitilde{}6.28 seconds). Importantly,
+we achieve different periods of oscillation without changing the neural
+property $\tau$; rather, we change the function being computed by
+the feedback connection, resulting in a different set of connection
+weights. For example, we could compute \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}[-x_{2}/2,-x_{1}/2]$},
+giving a period of $\pi$, instead. This same method works for nonlinear
+functions as well; in Figure \ref{fig:Two-dynamical-systems}b we
+show the classic Lorenz attractor \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}[10(x_{2}-x_{1}),x_{1}(28-x_{3})-x_{2},x_{1}x_{2}-\frac{8}{3}x_{3}]$}.
+This approach allows for the construction of neural models that correspond
+to a very large family of functions, including those typically employed
+by modern control theory and dynamic systems theory.
+
+It should be noted that networks constructed with this approach are
+fundamentally different from Echo State Networks \cite{jaeger2001}
+and Liquid State Machines \cite{Maass2002}. In both of those approaches,
+the recurrent connections are randomly chosen, and then a linear combination
+of the outputs are found that compute the desired function. With the
+NEF, we also find a linear combination of the outputs ($\mathbf{d}_{i}$),
+but we solve for the ideal recurrent connection weights to achieve
+the desired dynamics. This makes the NEF much more efficient and capable
+of computing a much wider range of dynamics.
+
+
+
+\subsection{Nengo}
+
+The principles of the NEF have been incorporated into the Nengo neural simulator \cite{Bekolay2014}.  This simulator
+
+- mention spaun
+
+These three principles are sufficient to implement all of our neural
+models. However, to simplify the process of constructing these models,
+we have developed an open-source software package known as Nengo (Neural
+ENGineering Objects) that creates and runs these models. Models can
+be built in Nengo using a drag-and-drop graphical user interface or
+specified using the Python scripting language. Full details and documentation
+can be found online at http://nengo.ca, and in other publications
+\cite{Stewart2009l}.
+
+For example, to create the model shown in Figure \ref{fig:Using-NEF-weights}a,
+we use the following script:
+\begin{verbatim}
+net = nef.Network("Identity Function")
+net.make("A", neurons=20, dimensions=1) 
+net.make("B", neurons=20, dimensions=1)
+net.connect("A", "B") 
+\end{verbatim}
+
+For Figure \ref{fig:Using-NEF-weights}b we need to compute the element-wise
+square. This is specified in a Python function as follows:
+
+\begin{verbatim}
+net = nef.Network("Element-wise Square")
+net.make("A", neurons=20, dimensions=1) 
+net.make("B", neurons=20, dimensions=1)
+
+def square(x):
+    return x{[}0{]}{*}x{[}0{]}, x{[}1{]}{*}x{[}1{]}
+
+net.connect("A", "B", func=square) 
+\end{verbatim}
+
+Nengo will automatically solve for the connection weights that will
+best approximate the provided function.
+
+Nengo also provides an interactive interface for displaying the results
+of a simulation while it is running, allowing for real-time interaction
+with a running model. This interface allows the generated plots to
+be exported, and was used to produce the previous figures in this
+paper (i.e. all figures in section \ref{sec:The-Neural-Engineering}).
+Furthermore, Nengo scales up to our largest models: the 2.5 million
+neuron Spaun model is run in Nengo, and can be downloaded at http://models.nengo.ca/spaun.
+
+
+- backends
+
+\subsubsection{Population mode}
+
+- Bryan???
 
 \subsubsection{Considerations related to hardware (multiplexing, clustering, using principal components)}
+
+- Murphy???
 
 % FIXME brief description of FPGA hardware and programming
 
@@ -634,5 +949,8 @@ decoded value buffers). A future version of the \design{} design may address
 this issue and implement an interconnect that scales well to larger numbers of
 encoders and decoded value buffers in order to allow more populations to be
 simulated. % FIXME how could this be done?
+
+\bibliographystyle{acm}
+\bibliography{references}
 
 \end{document}
