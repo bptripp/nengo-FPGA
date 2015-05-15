@@ -252,6 +252,8 @@ and we scale the input $\mathbf{u}(t)$ by $\tau$. For arbitrary
 dynamics of the form \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}f(\mathbf{x},\mathbf{u})$},
 we do a change of variables $\mathbf{x}^{\prime}=\langle\mathbf{x},\mathbf{u}\rangle$. 
 
+% @Chris: I don't get the last sentence above -- wasn't everything fine with x and u? 
+
 This exploitation of the inherent first-order low-pass filter found
 in synaptic connections allows for the implementation of a very wide
 variety of systems, including oscillators, integrators, and arbitrary
@@ -295,12 +297,16 @@ best approximate the provided nonlinear, dynamic function.  To run this same net
 Nengo also provides an interactive interface for building models, and displaying the results of a simulation while it is running, allowing for real-time interaction
 with a running model.
 
-In this paper, we describe an extension to the Nengo simulator that allows models to compile to an FPGA, using a simulation method that efficiently approximates the computations performed by populations of spiking neurons.
+In this paper, we describe an extension to the Nengo simulator that allows models to compile to an FPGA, using a simulation method that efficiently approximates the computations performed by populations of spiking neurons (see "population mode", next section).
 
 \subsubsection{Population mode}
 
-- Bryan???
-- mention the other modes first to provide context/more info about Nengo
+Nengo can run network simulations in several different "modes", which provide different trade-offs between speed and accuracy. "Default mode" performs spiking simulations in the manner described above. In "rate mode", the simulator does not integrate the membrane dynamic equations, but instead calculates an analytical spike rate for each neuron based on its net input. Rate mode typically runs slightly faster than default mode, but it ignores high-frequency spike-related fluctuations in synaptic current. 
+Another particularly useful mode is "direct mode". In direct mode, neurons are not simulated at all. Rather, the abstract dynamic equations, \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}\mathbf{f}(\mathbf{x}(t))+\mathbf{u}(t)$}, are simulated directly. These simulations are very fast, but they omit both spike-related fluctuations and also any static biases that arise from approximation of idealized functions with sums of spike rates. (Such biases are often substantial, particularly as spike rates saturate outside a population's normal operating range.) Despite this high level of abstraction, direct mode is very useful for rapidly prototyping and debugging high-level network function, and also for exploring differences between idealized network function and its approximation by neurons. 
+
+We recently designed an additional new simulation mode \cite{Tripp2015}, which we call "population mode". In population mode, the simulator runs efficient surrogate models of population output. These models are slightly more computationally intensive than direct mode, but they are more realistic in that they include both static biases and spike-related fluctuations (similar to default mode). Specifically, they model the difference between the output of each population in default mode and direct mode, i.e. $\mathbf{e}(\mathbf{x},t)=\mathbf{f}(\mathbf{x})-\sum_{i}a_{i}(\mathbf{x)}\mathbf{d}_{i}^{\mathbf{f}}$. This difference is modelled as $\mathbf{e}(\mathbf{x},t)=\mathbf{s}_{\mathbf{x}}(t) + \mathbf{b}({\mathbf{x})}$, where $\mathbf{s}_{\mathbf{x}}(t)$ is the spike-related fluctuations (the difference between default and rate modes), and $\mathbf{b}(\mathbf{x})$ is the static bias (the difference between rate and direct modes). The bias model $\bar{\mathbf{b}}(\mathbf{x}) \approx \mathbf{b}(\mathbf{x})$ consists of an interpolation or regression between sampled values, and $\bar{\mathbf{s}}_{\mathbf{x}} \approx \mathbf{s}_{\mathbf{x}}$ consists of Gaussian white noise that is filtered to approximate the spectrum of the population's default-mode output fluctuations. This approach has been demonstrated in models of neural integrators, nonlinear oscillators, and dynamic neural fields \cite{Tripp2015}. 
+
+The system introduced here is an implementation of population mode for field-programmable gate arrays. It is also the first Nengo backend to support population mode, since the approach was developed in stand-alone software. 
 
 \subsubsection{Considerations related to hardware (multiplexing, clustering, using principal components)}
 
