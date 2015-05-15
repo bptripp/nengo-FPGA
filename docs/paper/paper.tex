@@ -8,9 +8,10 @@
 \usepackage{listings}
 \usepackage{authblk}
 \usepackage{amsmath}
+\usepackage{url}
+\usepackage{marvosym}
 
-
-\newcommand{\design}{Nengo-RT}
+\newcommand{\design}{Nengo\char`_FPGA}  %% Could be xFPGA to specify xilinx? since there might be other fpga backends
 
 \begin{document}
 
@@ -18,6 +19,7 @@
 
 \title{Large-scale neural circuits on an FPGA}
 
+% I don't care about order, just assumed you'd want to be 'senior author'
 \author[1]{Murphy Berzish}
 \author[1,2,3]{Chris Eliasmith}
 \author[1,2]{Bryan Tripp}
@@ -26,23 +28,47 @@
 \affil[3]{Dept. of Philosophy, University of Waterloo}
 \maketitle
 
-\abstract{abstract goes here - bryan???}
+\begin{abstract}
+abstract goes here - bryan???
+- ??? I think we want spiking neuron and population model simulation comparisons for the software simulations when comparing to hardware
+\end{abstract}
 
 \section{Introduction}
 
+Large-scale neural models have recently become centrepieces of very large international research investments. The controversial European Human Brain Project (HBP) has a central goal of developing a human-scale neural simulation in the next 10 years, and has been granted \EURtm 1 billion to do so.  Similarly, the Obama Brain Initiative (OBI) in the US is investing well over \$1 billion over a similar timeframe in theoretical and experimental neuroscience. Both projects have identified massive increases in computational performance as a critical for achieving their goals.
+
+One approach to solving this challenge is employing large supercomputers, such as the IBM BlueGene.  Both HBP and OBI have exploited this resource to simulation millions or billions of neurons, although not in real time.  However, such resources are available to only a select few researchers.
+
+Another approach is to build specialized hardware -- often called ``neuromorphic'' hardware -- to massively increase the efficiency and speed of neural simulations.  There have been several exciting developments in this regards, both in industry and in academia.  IBM recently announced what will soon be the first commercially available neuromorphic chip \cite{Merolla2014}. As well, several academic projects, such as the SpiNNaker \cite{Khan2008} and Neurogrid \cite{Choudhary2012} projects have made impressive progress in recent years (see Section \ref{sub:neuromorphic} for further discussion).  However, these solutions are not available in large quantities, and hence remain inaccessible to a majority of researchers.
+
+Here, we focus on developing an affordable and accessible solution to the problem of simulating large-scale neural circuits.  Our approach allows anyone with access to off-the-shelf FPGA hardware to simulate models up to about 10 million equivalent neurons with arbitrary connectivity in real time.
+
+Importantly, this level of scaling is dependent on the notion of ``equivalent neurons.'' In Section {\ref{sub:NEF}} we discuss our theoretical approach that allows extremely good approximations of the activity of about a thousand spiking neurons by simulating them as a single population, at a resolution of about 1~ms.  Simulating large neural circuits at this level of abstraction allows for very computationally efficient solutions that preserve function. The main cost of this excellent computational scaling is that these methods do not allow online tuning of the connection weights between individual cells.  However, a large-class of adaptive and non-adaptive massively parallel circuits can be effectively simulated, providing a useful tool for exploring the class of brain-like algorithms.
+
+Indeed, one of the main benefits of our approach is that it focusses both on function and biological plausibility, in contrast to work presented by HBP and OBI  which captures little function \cite{eliasmith2013a}.  This focus remains here, allowing the methods presented to be applied both to characterizing biological cognition and to exploring engineering applications of brain-like algorithms. To this end, we present examples that compute specific mathematical functions, as well as those that simulate early visual processing of time-varying stimuli.
+
+We begin our discussion by describing related neuromorphic approaches in the next section.  We then explain our methods for constructing neural simulations, and demonstrate the equivalence between single cell and population-level simulations.  Next, we discuss the hardware design and show that it is able to efficiently simulate a variety of small test circuits.  We then show that the system scales efficiently to simulating very large models in real time. We conclude by discussing possible improvements to the current design.
 
 
-\subsection{Motivation}
+\subsection{\label{sub:neuromorphic}Current Neuromorphic Hardware\protect\footnote{This discussion is based on that in \cite{eliasmith2015a}.}}
 
-- potential applications
+Perhaps best known neuromorphic hardware is that being developed by IBM.  The architecture itself is called TrueNorth. It includes a digital model of individual neurons, and a method for programming the architecture \cite{Esser2013}.  The purpose of this architecture is to exploit brain-like organization, to permit the simulation of a specific class of algorithms that do not efficiently run on classical computer architectures. IBM researchers argue that the ``low-precision, synthetic, simultaneous, pattern-based metaphor of TrueNorth is a fitting complement to the high-precision, analytical, sequential, logic-based metaphor of today's of von Neumann computers'' \cite[p.~1]{Esser2013}. 
 
-\subsection{State of the Art (Neuromorphic Hardware)}
+TrueNorth has neurons organized into 256 neuron blocks in which each neuron can receive input from 256 axons. To assist with programming this hardware, IBM has introduced the notion of a ``corelet'', which is an abstraction that encapsulates local connectivity in small networks. These act like small programs that can be composed in order to build up more complex functions. To date the demonstrations of the approach have focused on simple, largely feed-forward, standard applications, although they have employed wide range of methods including RBMs, liquid state machines, HMMs, and very simple NEF networks. It should be noted that the proposed chip does not yet exist, and current demonstrations are on detailed simulations of the architecture. However, because it is a digital chip the simulations are highly accurate.
 
-- from my other paper for mind collection
+A direct competitor to IBM's approach is the Zeroth neuromorphic chip from Qualcomm. Like IBM, Qualcomm believes that constructing brain-inspired hardware will provide a new paradigm for exploiting the efficiencies of neural computation for the kinds of information processing that brains excel at, but which are extremely challenging for standard von Neumann approaches. The main difference between these 2 approaches is that Qualcomm has committed to allowing online learning to take place on the hardware. Consequently, they announced their processor by demonstrating its application in a reinforcement learning paradigm on a real-world robot. They have released videos of the robot maneuvering in an environment and learning to only visit one kind of stimulus (white boxes; \url{http://www.youtube.com/watch?v=8c1Noq2K96c}). It should again be noted that this is an FPGA simulation of a digital chip which does not yet exist. However the simulation, like IBM's, is highly accurate.  However, it has recently been suggested that Qualcomm is no longer fully supporting this research effort.
+
+Both of these projects are spearheaded by industry.  In the academic sphere, the Spinnaker project at Manchester University has not focused on designing new kinds of chips, but instead focused on using low-power ARM processors at a massive scale to allow large-scale brain simulations \cite{Khan2008}. As a result, the focus has been on designing approaches to routing that allow for the high bandwidth communication that underwrites much of the brain's information processing. Simulations on the Spinnaker hardware typically employ spiking neurons, like IBM and Qualcomm, and occasionally allow for learning \cite{davies2013spike}, like Qualcomm's approach. However, even with low power conventional chips, the energy usage is projected to be higher on the Spinnaker platform per neuron. Nevertheless, Spinnaker boards have been used in a wider variety of larger-scale embodied, and non-embodied applications. These include simulating place cells, path integration, item classification, and simple sensory guided movements \cite{Stewart2013a}.
+
+There are also a number of neuromorphic projects that use analog instead of digital implementations of neurons. Analog approaches tend to be several orders of magnitude more power efficient \cite{hasler2013}, although also more noisy, unreliable, and subject to process variation. These projects include work on the Neurogrid chip at Stanford University \cite{Choudhary2012}, and on a chip at ETH Z\"{u}rich \cite{Corradi2014}. The Neurogrid chip has demonstrated large numbers of simulated neurons, up to 1 million, while the ETH Z\"{u}rich chip allows for online learning. More recently, the Neurogrid chip has been used to control a nonlinear, 6 degree of freedom robotic arm, exhibiting perhaps the most sophisticated information processing from an analog chip to date \cite{Menon14:biorob}. 
+
+In addition to the above neuromorphic projects, which are focused on cortical simulation, there have been several specialized neuromorphic chips that mimic the information processing of different perceptual systems. For example, the dynamic vision sensor (DVS) artificial retina developed at ETH Z\"{u}rich performs real-time vision processing that results in a stream of neuron-like spikes \cite{Lichtsteiner2008}. Similarly, an artificial cochlea called AEREAR2 has been developed that generate spikes in response to auditory signals \cite{Li2012}. The development of these and other neuronal sensors make it possible to build fully embodied spiking neuromorphic systems \cite{Galluppi2014}. 
+
+More directly relevant to the present paper, there have be several attempts to build neuromorphic systems on FPGAs.  For instance, \cite{cassidy2011design} describe a design with a million ``neurons'', where each neuron is abstracted as an arithmetic logic unit.  In contrast to our design, all neurons are considered identical, there are no synaptic dynamics, and there is no modelling of neural noise. In \cite{li2012a}, synaptic dynamics are included, but the network consists of a total of 256 neurons.  More recently, in \cite{wang2013} a network of over 4 thousand neurons is implemented.  However, the approach we describe here is focussed on simulations of much larger numbers of effective neurons.
 
 \section{Methods}
 
-\subsection{The Neural Engineering Framework}
+\subsection{\label{sub:NEF}The Neural Engineering Framework}
 
 The Neural Engineering Framework (NEF) is method for constructing biologically realistic neural models \cite{Eliasmith1999s}.  Several overviews of the NEF are available \cite{Eliasmith2003f,Eliasmith2005p,stewart2012b,Eliasmith2012b}, but the description provided here is based on that in \cite{Stewart2014}.   
 The NEF is a general-purpose approach to
@@ -115,9 +141,9 @@ neural models work with the NEF.
 
 Given an encoding operation, it is natural to define a \textit{decoding} operation,
 in order to characterize the information processing characteristics
-of the system (in this case an ensemble of neurons). To decode a continuous
+of the system. To decode a continuous
 estimate of the input from neural activity, the NEF focuses on the
-postsynpatic filtered activity generated by the reception of a spike
+postsynaptic filtered activity generated by the reception of a spike
 at a synapse. This activity is taken to be a linear filter applied
 to the spiking activity:
 \[
@@ -129,10 +155,7 @@ type at the synapse, '$*$' is the convolution operator, and $\delta_{i}(t-t_{j}(
 is the spike train produced by neuron $i$ in response to input $\mathbf{x}$,
 with spike times indexed by $j$. Having defined this continuous variable,
 which is equal to the spike rate as $\tau_{PSC}\rightarrow\infty$,
-we can specify a decoding operation for estimating the input $\mathbf{x}$.
-
-For reasons that will be apparent in a moment, we use a \textit{linear}
-decoder:
+we can specify a decoding operation for estimating the input $\mathbf{x}$:
 
 \begin{equation}
 \hat{\mathbf{x}}=\sum_{i}^{N}a_{i}\mathbf{(x)}\mathbf{d}_{i}\label{eq:dec}
@@ -142,37 +165,19 @@ are the linear decoders, and $\hat{\mathbf{x}}$ is the estimate of
 the original $\mathbf{x}$ value that produced the neural activity
 (\ref{eq:enc}). 
 
-Any optimization method can be used to find these decoders. The simplest
-is to use standard least-squares optimization:
+Any optimization method can be used to find these decoders. A simple example is least-squares optimization:
 \begin{equation}
 \underset{\mathbf{d}_{i}}{arg\, min}\int[\mathbf{x}-\sum_{i}^{N}a_{i}(\mathbf{x)}\mathbf{d}_{i}]^{2}d\mathbf{x}\label{eq:error}
 \end{equation}
 where $\mathbf{d}_{i}$ are the decoding vectors over which this error
-is minimized and the integral is over all $\mathbf{x}$ values. It
-has been shown that linear decoders are sufficient to decode \textasciitilde{}95\%
-of the information available in a single spike train generated by
-a stimulus \cite{Rieke1997b}. Furthermore, as the number of neurons
-$N$ increases, the mean squared error decreases as $1/N$. The NEF
-decoding process is depicted in Figure \ref{fig:NEF-decoding}, where
-the optimal linear decoders have been found and used for twenty neurons.
-Temporal decoding is also linear, as described, and is performed using
-the postsynaptic, current-based filters (see section \ref{sub:Principle-3--}
-for further discussion).
+is minimized and the integral is over all $\mathbf{x}$ values. As the number of neurons
+$N$ increases, the mean squared error decreases as $1/N$. 
 
-While linear decoders are useful for visualizing the information encoded
-within the activity of a group of neurons, they also provide a direct
-way to solve for connection weights between groups of neurons. This
+Note that employing linear decoding allows us to compute connection weights. This
 is a key advantage of the NEF: rather than using a learning rule to
 optimize over the entire space of all connection weights, we instead
 solve the simpler problem of optimizing over the space of linear decoders,
-and then use that result to solve for the connection weights. Importantly,
-given the characterization of neural activity with preferred direction
-vectors, there is no difference between using this smaller space and
-using the equivalent full connection matrix. Interestingly, this general
-technique has started to be applied in broader domains; see \cite{tapson2013}
-for an overview.
-
-For example, if a connection between neural groups is meant to compute
+and then use that result to solve for the connection weights. For example, if a connection between neural groups is meant to compute
 the identity function $\mathbf{y}=\mathbf{x}$ (where $\mathbf{y}$
 is the vector space represented by the second population B and $\mathbf{x}$
 is the vector space represented by the first population A), the connections
@@ -181,19 +186,19 @@ between individual neurons are given by
 \omega_{ij}=\alpha_{j}\mathbf{d}_{i}\mathbf{e}_{j}\label{eq:weights}
 \end{equation}
 where $i$ indexes the neurons in group A and $j$ indexes the neurons
-in B. Behavior of this network is shown in Figure \ref{fig:Using-NEF-weights}a. 
+in B.
 
-While the least-squares method for optimization we use here is not
-biologically plausible on its own, we have also shown that biologically
-realistic learning rules will converge on a similar solution \cite{MacNeil2011a}.
+While the least-squares method for optimization is not
+biologically plausible on its own, we have shown that biologically
+realistic learning rules will converge to a similar solution \cite{MacNeil2011a}.
 These realistic rules are, however, several orders of magnitude more
 computationally expensive.
 
 \subsection{Principle 2 - Transformation}
 
-Connections between groups of neurons can also compute functions other
-than the identity function. That is instead of \textbf{$\mathbf{y}=\mathbf{x}$}
-we can do \textbf{$\mathbf{y}=f(\mathbf{x})$}. We do this by finding
+Principle 1 effectively assumes that we want to compute the identity function. Connections between groups of neurons can also compute functions other
+than the identity function. That is, instead of \textbf{$\mathbf{y}=\mathbf{x}$}
+we can compute \textbf{$\mathbf{y}=f(\mathbf{x})$}. We do this by finding
 decoders \textbf{$\mathbf{d}_{i}^{f}$ }for the particular function\textbf{
 $f(\mathbf{x})$} by substituting \textbf{$f(\mathbf{x})$ }for $\mathbf{x}$
 in equation (\ref{eq:error}).
@@ -201,7 +206,6 @@ in equation (\ref{eq:error}).
 \begin{equation}
 \underset{\mathbf{d}_{i}^{f}}{arg\, min}\int[f(\mathbf{x})-\sum_{i}a_{i}(\mathbf{x)}\mathbf{d}_{i}^{f}]^{2}d\mathbf{x}.\label{eq:error-fcns}
 \end{equation}
-
 
 The connection weights can then be computed using (\ref{eq:weights}).
 For the special case of linear functions\textbf{ $\mathbf{y}=\mathbf{L}\mathbf{x}$},
@@ -213,31 +217,28 @@ are:
 \begin{equation}
 \omega_{ij}=\alpha_{j}\mathbf{d}_{i}^{f}\mathbf{L}\mathbf{e}_{j}\label{eq:weights-general}
 \end{equation}
-Figure \ref{fig:Using-NEF-weights}b shows the computation of the
-element-wise square ($f(\mathbf{x})=[x_{1}^{2},x_{2}^{2}]$).
 
 
 \subsection{\label{sub:Principle-3--}Principle 3 - Dynamics}
 
 While the first two principles are sufficient to build neural approximations
-of any desired function of the vector $\mathbf{x}$, the NEF also
+of any desired feedforward function of the vector $\mathbf{x}$, the NEF also
 provides a method for computing functions of the form \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}f(\mathbf{x},\mathbf{u})$},
-where $\mathbf{u}$ is the input from some other population. We do
-this by exploiting the fact that neurons do not simply accept input
+where $\mathbf{u}$ is the input from some other population. The NEF exploits the fact that neurons do not simply accept input
 as spikes. Rather, when a spike is transmitted from one neuron to
 another, the actual current that flows into the second neuron is a
 low-pass-filtered version of that spike. In particular, the post-synaptic
 current is well-approximated by $h(t)=u(t)e^{-t/\tau}$, where $u(t)$
 is the step function and $\tau$ is the time constant of the neurotransmitter
 used. This time constant varies throughout the brain, e.g., from 2-5
-ms (AMPA; \cite{jonas1993quantal}) up to \textasciitilde{}100ms (NMDA;
+ms (AMPA; \cite{jonas1993quantal}) up to $\sim$100ms (NMDA;
 \cite{sah1990properties}). The effect of this filter is that instead
 of a connection computing the function $\mathbf{y}(t)=f(\mathbf{x}(t))$
 it will compute $\mathbf{y}(t)=f(\mathbf{x}(t))*h(t)$ (or, in the
 Laplace domain, $\mathbf{Y}(s)=\mathbf{F}(s)H(s)$).
 
 It turns out that this implicit low-pass filter can be used to generate
-neural models that compute abitrary dynamics. Given a neural population
+neural models that compute arbitrary dynamics. Given a neural population
 representing $\mathbf{x}$, an input $\mathbf{u}(t)$, and a feedback
 connection from $\mathbf{x}$ back to itself computing $g(\mathbf{x}(t))$,
 we note that in the Laplace domain we get $\mathbf{X}(s)=(\mathbf{G}(s)+\mathbf{U}(s))H(s)$.
@@ -254,89 +255,52 @@ we do a change of variables $\mathbf{x}^{\prime}=\langle\mathbf{x},\mathbf{u}\ra
 This exploitation of the inherent first-order low-pass filter found
 in synaptic connections allows for the implementation of a very wide
 variety of systems, including oscillators, integrators, and arbitrary
-attractor networks \cite{Eliasmith2005p}. Figure \ref{fig:Two-dynamical-systems}a
-shows a single neural population with a recurrent feedback connection
-computing the standard linear oscillator \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}[-x_{2},-x_{1}]$}.
-Here, the post-synapic time constant $\tau$ is 100ms, but the period
-of oscillation is $2\pi$ (\textasciitilde{}6.28 seconds). Importantly,
-we achieve different periods of oscillation without changing the neural
-property $\tau$; rather, we change the function being computed by
-the feedback connection, resulting in a different set of connection
-weights. For example, we could compute \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}[-x_{2}/2,-x_{1}/2]$},
-giving a period of $\pi$, instead. This same method works for nonlinear
-functions as well; in Figure \ref{fig:Two-dynamical-systems}b we
-show the classic Lorenz attractor \textbf{$\mathbf{\frac{\mathrm{d}x}{\mathrm{dt}}=}[10(x_{2}-x_{1}),x_{1}(28-x_{3})-x_{2},x_{1}x_{2}-\frac{8}{3}x_{3}]$}.
+attractor networks \cite{Eliasmith2005p}. 
 This approach allows for the construction of neural models that correspond
 to a very large family of functions, including those typically employed
 by modern control theory and dynamic systems theory.
 
-It should be noted that networks constructed with this approach are
-fundamentally different from Echo State Networks \cite{jaeger2001}
-and Liquid State Machines \cite{Maass2002}. In both of those approaches,
-the recurrent connections are randomly chosen, and then a linear combination
-of the outputs are found that compute the desired function. With the
-NEF, we also find a linear combination of the outputs ($\mathbf{d}_{i}$),
-but we solve for the ideal recurrent connection weights to achieve
-the desired dynamics. This makes the NEF much more efficient and capable
-of computing a much wider range of dynamics.
-
-
-
 \subsection{Nengo}
 
-The principles of the NEF have been incorporated into the Nengo neural simulator \cite{Bekolay2014}.  This simulator
+The principles of the NEF have been incorporated into the Nengo neural simulator \cite{Bekolay2014}.  Nengo is a general purpose simulator that incorporates the three principles of the NEF.  It has been used to build what is currently the world's largest functional brain model \cite{Eliasmith2012b}, along with many other simulations. Full details and documentation can be found online at \url{http://github.com/nengo/nengo}.
 
-- mention spaun
-
-These three principles are sufficient to implement all of our neural
-models. However, to simplify the process of constructing these models,
-we have developed an open-source software package known as Nengo (Neural
-ENGineering Objects) that creates and runs these models. Models can
-be built in Nengo using a drag-and-drop graphical user interface or
-specified using the Python scripting language. Full details and documentation
-can be found online at http://nengo.ca, and in other publications
-\cite{Stewart2009l}.
-
-For example, to create the model shown in Figure \ref{fig:Using-NEF-weights}a,
-we use the following script:
-\begin{verbatim}
-net = nef.Network("Identity Function")
-net.make("A", neurons=20, dimensions=1) 
-net.make("B", neurons=20, dimensions=1)
-net.connect("A", "B") 
-\end{verbatim}
-
-For Figure \ref{fig:Using-NEF-weights}b we need to compute the element-wise
-square. This is specified in a Python function as follows:
+One central feature of Nengo is that it permits the same model description to target a variety of ``backends.''  Current backends include CPUs, GPUs, the IBM BlueGene supercomputer, and several neuromorphic chips, including SpiNNaker \cite{Khan2008} and Neurogrid \cite{Choudhary2012}.  Because Nengo exploits the NEF methods, model descriptions can be very concise.  Model descriptions are written in python, although backends compile to a variety of languages, depending on the target hardware. For example, to create a recurrent model of a chaotic dynamical system (a Lorenz attractor) with 2000 spiking neurons and run it for 10 seconds, the following suffices:
 
 \begin{verbatim}
-net = nef.Network("Element-wise Square")
-net.make("A", neurons=20, dimensions=1) 
-net.make("B", neurons=20, dimensions=1)
+import nengo
 
-def square(x):
-    return x{[}0{]}{*}x{[}0{]}, x{[}1{]}{*}x{[}1{]}
-
-net.connect("A", "B", func=square) 
+model = nengo.Network()
+with model:
+    state = nengo.Ensemble(2000, 3, radius=60)
+	
+	def feedback(x):
+	    dx0 = -10 * x[0] + 10 * x[1]
+	    dx1 = -x[0] * x[2] - x[1]
+	    dx2 = x[0] * x[1] - 8.0/3 * (x[2] + 28) - 28
+	
+	    return [dx0 * 0.1 + x[0],
+	            dx1 * 0.1 + x[1],
+	            dx2 * 0.1 + x[2]]
+	                
+    nengo.Connection(state, state, function=feedback, synapse=0.1)
+    state_probe = nengo.Probe(state, synapse=tau)
+    
+sim = nengo.Simulator(model)
+sim.run(10)
 \end{verbatim}
 
-Nengo will automatically solve for the connection weights that will
-best approximate the provided function.
+Nengo will use the NEF methods to automatically solve for the connection weights that will
+best approximate the provided nonlinear, dynamic function.  To run this same network on a different backend, we only need change the second last line to indicate which simulator to use.
 
-Nengo also provides an interactive interface for displaying the results
-of a simulation while it is running, allowing for real-time interaction
-with a running model. This interface allows the generated plots to
-be exported, and was used to produce the previous figures in this
-paper (i.e. all figures in section \ref{sec:The-Neural-Engineering}).
-Furthermore, Nengo scales up to our largest models: the 2.5 million
-neuron Spaun model is run in Nengo, and can be downloaded at http://models.nengo.ca/spaun.
+Nengo also provides an interactive interface for building models, and displaying the results of a simulation while it is running, allowing for real-time interaction
+with a running model.
 
-
-- backends
+In this paper, we describe an extension to the Nengo simulator that allows models to compile to an FPGA, using a simulation method that efficiently approximates the computations performed by populations of spiking neurons.
 
 \subsubsection{Population mode}
 
 - Bryan???
+- mention the other modes first to provide context/more info about Nengo
 
 \subsubsection{Considerations related to hardware (multiplexing, clustering, using principal components)}
 
@@ -346,7 +310,7 @@ neuron Spaun model is run in Nengo, and can be downloaded at http://models.nengo
 
 \subsection{High-level system description}
 
-\design{} is a custom digital hardware design that implements the population-mode NEF in real-time (1~ms timestep).
+\design{} is a custom digital hardware design that implements the population-mode NEF in real-time (1~ms timestep) on an FPGA.
 A block diagram of the design is shown in Figure~\ref{fig:system}.
 The encoder units perform the function of encoding (), % FIXME NEF equation
 while the population units perform the decoding () % FIXME NEF equation
@@ -639,7 +603,7 @@ transfers the configuration data to the hardware and controls input and output d
 % clustering algorithm, quantization error for large populations -- this needs its own section
 
 \section{Results}
-
+- ??? Schematics could come from the Nengo visualizer, for consistency and ease.
 % integrator (1d)
 % oscillator (2d)
 % feed-forward nonlinear functions
@@ -888,6 +852,11 @@ simulation of a neural multiplier network.}
 \label{fig:multiplier}
 \end{figure}
 
+\section{Large-scale simulation}
+
+- Bryan??? Describe the V1 model, simulate it and show results... big as possible
+
+
 \section{Discussion}
 
 \subsection{How well it worked}
@@ -903,7 +872,7 @@ dimensions it would become impractical to implement a hardware
 population unit.  
 
 Nengo supports a more advanced connection called a learning connection,
-which mdoifies the decoders of a population according to a particular ``learning rule''
+which modifies the decoders of a population according to a particular ``learning rule''
 as a function of other represented values. The hardware design does not support this special connection type.
 It was decided to implement the most common cases first in order to demonstrate the feasibility of simulating
 neural networks in population mode on the hardware, and since many networks do not use learning connections,
@@ -920,7 +889,6 @@ setting the second element of each neuron's encoder to -1, and connecting inhibi
 % high-frequency stuff (this will depend on other results)
 
 \subsection{Future work \& extensions}
-
 
 The flexibility of input and output channels lends to their use in connecting multiple devices together for use as part of a larger simulation engine.
 This would allow networks to be simulated that consume more resources than are available on a single device, which may in turn allow
@@ -949,6 +917,10 @@ decoded value buffers). A future version of the \design{} design may address
 this issue and implement an interconnect that scales well to larger numbers of
 encoders and decoded value buffers in order to allow more populations to be
 simulated. % FIXME how could this be done?
+
+\subsection{Conclusion}
+
+- Bryan???
 
 \bibliographystyle{acm}
 \bibliography{references}

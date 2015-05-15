@@ -14,10 +14,38 @@
 \newblock In {\em 35th Annual Conference of the Cognitive Science Society\/}
   (2013), Cognitive Science Society, pp.~169--174.
 
+\bibitem{cassidy2011design}
+{\sc Cassidy, A., Andreou, A.~G., and Georgiou, J.}
+\newblock Design of a one million neuron single fpga neuromorphic system for
+  real-time multimodal scene analysis.
+\newblock In {\em Information Sciences and Systems (CISS), 2011 45th Annual
+  Conference on\/} (2011), IEEE, pp.~1--6.
+
+\bibitem{Choudhary2012}
+{\sc Choudhary, S., Sloan, S., Fok, S., Neckar, A., Eric, Trautmann, Gao, P.,
+  Stewart, T., Eliasmith, C., and Boahen, K.}
+\newblock {Silicon neurons that compute}.
+\newblock In {\em International Conference on Artificial Neural Networks\/}
+  (2012), pp.~121--28.
+
 \bibitem{Conklin2005b}
 {\sc Conklin, J., and Eliasmith, C.}
 \newblock {An attractor network model of path integration in the rat}.
 \newblock {\em Journal of Computational Neuroscience 18\/} (2005), 183--203.
+
+\bibitem{Corradi2014}
+{\sc Corradi, F., Eliasmith, C., and Indiveri, G.}
+\newblock {Mapping arbitrary mathematical functions and dynamical systems to
+  neuromorphic VLSI circuits for spike-based neural computation}.
+\newblock In {\em IEEE International Symposium on Circuits and Systems
+  (ISCAS)\/} (Melbourne, 2014).
+
+\bibitem{davies2013spike}
+{\sc Davies, S., Stewart, T., Eliasmith, C., and Furber, S.}
+\newblock {Spike-based learning of transfer functions with the SpiNNaker
+  neuromimetic simulator}.
+\newblock In {\em International Joint Conference on Neural Networks 2013\/}
+  (2013), pp.~1832--1839.
 
 \bibitem{Dewolf}
 {\sc Dewolf, T., and Eliasmith, C.}
@@ -34,6 +62,12 @@
 \newblock {A unified approach to building and controlling spiking attractor
   networks}.
 \newblock {\em Neural computation 17}, 6 (2005), 1276--1314.
+
+\bibitem{eliasmith2015a}
+{\sc Eliasmith, C.}
+\newblock {On the Eve of Artificial Minds}.
+\newblock In {\em Open MIND}, T.~Metzinger and J.~Windt, Eds. Frankfurt am
+  Main: MIND Group, 2015.
 
 \bibitem{Eliasmith1999s}
 {\sc Eliasmith, C., and Anderson, C.~H.}
@@ -53,11 +87,34 @@
 \newblock {A large-scale model of the functioning brain}.
 \newblock {\em Science 338\/} (2012), 1202--1205.
 
+\bibitem{eliasmith2013a}
+{\sc Eliasmith, C., and Trujillo, O.}
+\newblock {The use and abuse of large-scale brain models}.
+\newblock {\em Current Opinion in Neurobiology 25\/} (2013).
+
+\bibitem{Esser2013}
+{\sc Esser, S.~K., Andreopoulos, A., Appuswamy, R., Datta, P., Barch, D., Amir,
+  A., Arthur, J., Cassidy, A., Flickner, M., Merolla, P., Chandra, S.,
+  Basilico, N., Carpin, S., Zimmerman, T., Zee, F., Alvarez-Icaza, R., Kusnitz,
+  J.~A., Wong, T.~M., Risk, W.~P., McQuinn, E., Nayak, T.~K., Singh, R., and
+  Modha, D.~S.}
+\newblock {Cognitive computing systems: Algorithms and applications for
+  networks of neurosynaptic cores}.
+\newblock In {\em The 2013 International Joint Conference on Neural Networks
+  (IJCNN)\/} (Aug. 2013), IEEE, pp.~1--10.
+
 \bibitem{Fischer2009w}
 {\sc Fischer, B.~J., Pe\~{n}a, J.~L., and Konishi, M.}
 \newblock {Emergence of multiplicative auditory responses in the midbrain of
   the barn owl.}
 \newblock {\em Journal of neurophysiology 98}, 3 (Sept. 2007), 1181--93.
+
+\bibitem{Galluppi2014}
+{\sc Galluppi, F., Denk, C., Meiner, M.~C., Stewart, T., Plana, L.~A.,
+  Eliasmith, C., Furber, S., and Conradt, J.}
+\newblock {Event-based neural computing on an autonomous mobile platform}.
+\newblock In {\em IEEE ICRA 2014, International Conference on Robotics and
+  Automation\/} (June 2014).
 
 \bibitem{Georgopoulos1989q}
 {\sc Georgopoulos, A.~P., Lurito, J.~T., Petrides, M., Schwartz, A., and
@@ -65,12 +122,10 @@
 \newblock {Mental rotation of the neuronal population vector}.
 \newblock {\em Science 243\/} (1989), 234--236.
 
-\bibitem{jaeger2001}
-{\sc H., J.}
-\newblock {The "echo state" approach to analysing and training recurrent neural
-  networks}.
-\newblock Tech. rep., GMD Report 148 - GMD German National Research Institute
-  for Computer Science, 2001.
+\bibitem{hasler2013}
+{\sc Hasler, J., and Marr, H.~B.}
+\newblock {Finding a Roadmap to achieve Large Neuromorphic Hardware Systems}.
+\newblock {\em Frontiers in Neuroscience 7}, 118 (2013).
 
 \bibitem{jonas1993quantal}
 {\sc Jonas, P., Major, G., and Sakmann, B.}
@@ -78,12 +133,37 @@
   CA3 pyramidal cells of rat hippocampus.}
 \newblock {\em The Journal of Physiology 472}, 1 (1993), 615--663.
 
+\bibitem{Khan2008}
+{\sc Khan, M., Lester, D., Plana, L., Rast, A., Jin, X., Painkras, E., and
+  Furber, S.}
+\newblock {\em {SpiNNaker: Mapping neural networks onto a massively-parallel
+  chip multiprocessor}}.
+\newblock IEEE, June 2008.
+
 \bibitem{Laubach2010}
 {\sc Laubach, M., Caetano, M.~S., Liu, B., Smith, N.~J., Narayanan, N.~S., and
   Eliasmith, C.}
 \newblock {Neural circuits for persistent activity in medial prefrontal
   cortex}.
 \newblock In {\em Society for Neuroscience Abstracts\/} (2010), p.~200.18.
+
+\bibitem{Li2012}
+{\sc Li, C.-H., Delbruck, T., and Liu, S.-C.}
+\newblock {Real-time speaker identification using the AEREAR2 event-based
+  silicon cochlea}.
+\newblock In {\em 2012 IEEE International Symposium on Circuits and Systems\/}
+  (May 2012), IEEE, pp.~1159--1162.
+
+\bibitem{li2012a}
+{\sc Li, J., Katori, Y., and Kohno, T.}
+\newblock {An FPGA-based silicon neuronal network with selectable excitability
+  silicon neurons}.
+\newblock {\em Frontiers in Neuroscience 6}, 183 (2012).
+
+\bibitem{Lichtsteiner2008}
+{\sc Lichtsteiner, P., Posch, C., and Delbruck, T.}
+\newblock {Temporal Contrast Vision Sensor}.
+\newblock {\em IEEE Journal of Solid-State Circuits 43}, 2 (2008), 566--576.
 
 \bibitem{Litt2008u}
 {\sc Litt, A., Eliasmith, C., and Thagard, P.}
@@ -96,27 +176,32 @@
   prefrontal cortex}.
 \newblock In {\em Computational and Systems Neuroscience 2011\/} (2011).
 
-\bibitem{Maass2002}
-{\sc Maass, W., Natschl$\backslash$$\backslash$"ager, T., and Markram, H.}
-\newblock {Real-time computing without stable states: A new framework for
-  neural computation based on perturbations}.
-\newblock {\em Neural computation 14}, 11 (2002), 2531--2560.
-
 \bibitem{MacNeil2011a}
 {\sc MacNeil, D., and Eliasmith, C.}
 \newblock {Fine-Tuning and the Stability of Recurrent Neural Networks}.
 \newblock {\em PLoS ONE 6}, 9 (Sept. 2011), e22885.
+
+\bibitem{Menon14:biorob}
+{\sc Menon, S., Fok, S., Neckar, A., Khatib, O., and Boahen, K.}
+\newblock Controlling articulated robots in task-space with spiking silicon
+  neurons.
+\newblock In {\em Biomedical Robotics and Biomechatronics (2014 5th IEEE RAS
+  EMBS International Conference on)\/} (August 2014), pp.~181--186.
+
+\bibitem{Merolla2014}
+{\sc Merolla, P.~A., Arthur, J.~V., Alvarez-Icaza, R., Cassidy, A.~S., Sawada,
+  J., Akopyan, F., Jackson, B.~L., Imam, N., Guo, C., Nakamura, Y., Brezzo, B.,
+  Vo, I., Esser, S.~K., Appuswamy, R., Taba, B., Amir, A., Flickner, M.~D.,
+  Risk, W.~P., Manohar, R., and Modha, D.~S.}
+\newblock {Artificial brains. A million spiking-neuron integrated circuit with
+  a scalable communication network and interface.}
+\newblock {\em Science (New York, N.Y.) 345}, 6197 (Aug. 2014), 668--73.
 
 \bibitem{Parisien2008c}
 {\sc Parisien, C., Anderson, C.~H., and Eliasmith, C.}
 \newblock {Solving the problem of negative synaptic weights in cortical
   models}.
 \newblock {\em Neural Computation 20\/} (2008), 1473--1494.
-
-\bibitem{Rieke1997b}
-{\sc Rieke, F., Warland, D., {de Ruyter van Steveninick}, R., and Bialek, W.}
-\newblock {\em {Spikes: Exploring the neural code}}.
-\newblock MIT Press, Cambridge, MA, 1997.
 
 \bibitem{Rust2006}
 {\sc Rust, N.~C., Mante, V., Simoncelli, E.~P., and Movshon, J.~A.}
@@ -140,6 +225,12 @@
 \newblock {Large-Scale Synthesis of Functional Spiking Neural Circuits}.
 \newblock {\em Proceedings of the IEEE 102}, 5 (May 2014), 881--898.
 
+\bibitem{Stewart2013a}
+{\sc Stewart, T., Galluppi, F., and Conradt, J.}
+\newblock {Learning by example with SpiNNaker, Nengo, and an omni-directional
+  robot}.
+\newblock In {\em Bernstein Sparks Workshop\/} (Tutzing, Germany, 2013).
+
 \bibitem{stewart2012b}
 {\sc Stewart, T.~C.}
 \newblock {The Neural Engineering Framework}.
@@ -151,19 +242,16 @@
   manipulating vector spaces with spiking neurons}.
 \newblock {\em Connection Science 23}, 2 (June 2011), 145--153.
 
-\bibitem{Stewart2009l}
-{\sc Stewart, T.~C., Tripp, B., and Eliasmith, C.}
-\newblock {Python scripting in the nengo simulator.}
-\newblock {\em Frontiers in neuroinformatics 3\/} (Jan. 2009), 7--16.
-
-\bibitem{tapson2013}
-{\sc Tapson, J., and van Schaik, A.}
-\newblock {Learning the pseudo inverse solution to network weights}.
-\newblock {\em Neural Networks 45\/} (2013), 94--100.
-
 \bibitem{Taube2007}
 {\sc Taube, J.~S.}
 \newblock {The head direction signal: origins and sensory-motor integration.}
 \newblock {\em Annual review of neuroscience 30\/} (Jan. 2007), 181--207.
+
+\bibitem{wang2013}
+{\sc Wang, R.~M., Cohen, G., Stiefel, K.~M., Hamilton, T.~J., Tapson, J.~C.,
+  and van Schaik, A.}
+\newblock {An FPGA implementation of a polychronous spiking neural network with
+  delay adaptation}.
+\newblock {\em Frontiers in Neuroscience 7}, 14 (2013).
 
 \end{thebibliography}
