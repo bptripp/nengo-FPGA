@@ -189,21 +189,21 @@ def check_gabor_approx():
     plt.show()
 
  
-def filter_default_dots():
+def filter_default_dots(dot_file):
     """
     Filter dot stimulus with DOG filter, where both dot stimulus and DOG params 
     are default values. 
     """
     x = np.arange(-40, 41, 1)
-    DOG2 = make_DOG(3, x)  
-    dots = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-2000ms-s02.p", "rb" ), encoding='latin1')  
+    DOG = make_DOG(3, x)  
+    dots = pickle.load(open(dot_file, "rb" ), encoding='latin1')  
     dots = dots - np.min(dots)
     filtered = np.zeros_like(dots)
     for i in range(dots.shape[2]):
         print('processing frame ' + str(i))    
-        filtered[:,:,i] = filter_dots(np.squeeze(dots[:,:,i]), DOG2)
+        filtered[:,:,i] = filter_dots(np.squeeze(dots[:,:,i]), DOG)
      
-    pickle.dump(filtered, open("/Users/bptripp/code/nengo-FPGA/v1/dog-filtered-dots-new.p", "wb" ))
+    pickle.dump(filtered, open(dot_file.replace('.p', '-filt.p'), "wb" ))
     
 def pure_gabor():
     """
@@ -237,7 +237,7 @@ def pure_gabor():
                 result[j,k,i] = np.sum(gabor * region)
     return result
 
-def get_default_inputs():
+def make_default_inputs(filtered_dot_file):
     """
     Obtain inputs for the neural model using default values for dot stimulus, DOG, 
     etc. 
@@ -249,24 +249,26 @@ def get_default_inputs():
 #     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-3.p", "rb" ))
 #     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-2.p", "rb" ))
 #     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-4.p", "rb" ))
-#     filtered = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-filtered-dots.p", "rb" ))
     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-new-2.p", "rb" ))
-    filtered = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-filtered-dots-new.p", "rb" ))
+    filtered = pickle.load(open(filtered_dot_file, "rb" ))
     
-    c = np.arange(87, 313, 25)
-    centres = np.zeros((c.size**2,2), dtype='int')
-    for i in range(c.size): 
-        for j in range(c.size): 
-            centres[i*c.size+j,0] = c[i]
-            centres[i*c.size+j,1] = c[j]
-    
-    print(centres)
-    
-#     centres = np.array([[200,200]]) 
-    return get_inputs(w_kernel, filtered, centres)
+    n_inputs = 200
+    centres = np.random.randn(n_inputs,2)
+    mag = np.sum(centres**2, axis=1)**(1/2)
+    centres = 180 * centres.T / mag
+    centres = centres * np.random.rand(n_inputs)**(1/2)
+    centres = np.round(centres).astype('int')
+
+    inputs = get_inputs(w_kernel, filtered, centres.T)
+    pickle.dump(inputs, open(filtered_dot_file.replace('-filt.p', '-inputs.p'), "wb" ))
 
 
-check_gabor_approx()
+# dot_file = "/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-s04.p"
+# filter_default_dots(dot_file)
+
+make_default_inputs("/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-s005-filt.p")
+
+# check_gabor_approx()
 # get_default_weights()
 
 # inputs = get_default_inputs()
