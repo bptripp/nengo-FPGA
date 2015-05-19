@@ -860,8 +860,38 @@ simulation of a neural multiplier network.}
 
 \section{Large-scale simulation}
 
-- Bryan??? Describe the V1 model, simulate it and show results... big as possible
+As an example of a large, real-time simulation, we adapted an existing model of visual motion sensitivity (ref Aziz). The original version of this model illustated a mechanism by which motion selectivity might arise from recurrent connections within V1. This mechanism is interesting because recurrent connections are anatomically prominent, but absent from classical models of motion selectivity (ref Hubel).  
+The recurrent connections are optimized, using the NEF, to approximate two-dimensional damped linear oscillators. Each oscillator receives subcortical burst input due to visual features at multiple spatial phases within the receptive field. Inputs from different parts of the receptive field drive the oscillator state in different directions. 
+As an example, consider a population in which input from the left half of the receptive field drives the oscillator state to the right, and input from the right half drives the state to the left. Suppose the oscillator state is initially zero, and a visual feature travels across the receptive field from left to right. When the input is on the left, it will drive the oscillator state from zero to the right. This will begin a damped oscillation, and a short time later the state will be travelling to the left. If input from the right half of the receptive field arrives at this time, it will drive the oscillator state further to the left, amplifying the oscillation. 
+Because the oscillator is damped, neurons that represent later states in the cycle are only active following this kind of constructive interference. These late-phase neurons provide output to MT populations. MT populations therefore respond to motion at speeds that maximize constructive interference in the corresponding V1 oscillators.  
 
+Our implementation of the model included 4500 oscillator populations of 200 motion-selective neurons each. These neurons had small, Gabor-shaped spatial receptive fields (roughly 40-pixel diameter). The populations varied in the positions of their receptive fields, and their direction and speed preferences. Six additional populations modelled a small part of area MT. Each of the MT populations received converging input from 100 V1 populations that spanned a receptive fields 400 pixels in diameter. 
+
+The model accepted 400x400 pixel, 100 frame/s video as input. As an abstraction of subcortical processing, each video frame was convolved with a difference-of-Gaussians filter. The V1 and MT populations ran at 1000 steps/s. Input to the neural model consisted of a 400x400-pixel input, $\mathbf{u}$, which was calculated from the most recent video frame. Specifically, pixels of $\mathbf{u}$ in which the filtered image both exceeded a threshold and exceeded its value in the previous frame were set to a high value for the next 6ms. This modelled bursting in magnocellular lateral geniculate nucleus (ref Aziz). 
+
+Each V1 population received weighted input from $\mathbf{u}$ in a spatially restricted receptive field. To set the weights, the difference-of-Gaussian functions used in the subcortical model were combined in a weighted sum, and the weights were optimized so that the weighted sum approximated Gabor functions. Groups of three Gabor functions with the same orientation and spatial frequency, but different phases, defined the inputs to groups of six V1 populations with the same spatial receptive field but different direction and speed preferences (see Figure) [TODO: picture of left, centre, right Gabor functions in 400x400 image; picture of dots]. The abstract population dynamics of the leftward-sensitive populations was 
+
+\[
+\dot{\mathbf{x}} = 
+\left[
+\begin{array}{cc}
+-\zeta & \omega \\ 
+-\omega & -\zeta \\ 
+\end{array}
+\right]
+\mathbf{x} + 
+\left[
+\begin{array}{c}
+\mathbf{w}_l^{T} - \mathbf{w}_r^{T} \\ 
+-\mathbf{w}_c^{T} \\ 
+\end{array}
+\right]
+\mathbf{u}
+\]
+
+where $\omega$ is the oscillator frequency, $\zeta$ is the damping ratio, and $\mathbf{w}_l$, $\mathbf{w}_c$, and $\mathbf{w}_r$ are vectors of the weights for the left, centre, and right Gabors, respectively. The first state variable was therefore driven to increase in response to input on the left and decrease in response to input on the right of the receptive field. The second state variable was driven to decrease in response to input in the centre of the receptive field. A stimulus passing across the receptive field from left to right at the right speed would therefore interfere constructively with the (clockwise) intrinsic oscillation of the population state. Input to the leftward-sensitive populations was the same except that the sign of the left and right signs were exchanged. To limit the size of the model, we only included populations sensitive to leftward and rightward motion (Our system is not able to simulate all of primate V1 on a single FPGA.) Full source code is available from the authors' web site (ref). 
+
+Figure XX shows simulations with coherent random dot stimuli. On the left are decoded outputs of representative V1 and MT populations from a spiking software simulation (default mode). On the right are the corresponding outputs from a population-mode simulation on the FPGA. The outputs are similar in each case. However, while the FPGA simulation ran in real time, the software software simulation ran at 1/??? real-time and consumed much more power. 
 
 \section{Discussion}
 
