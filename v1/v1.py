@@ -3,22 +3,29 @@ from scipy import ndimage as nd
 import matplotlib.pyplot as plt
 import pickle
 
-def make_DOG2(inner_sigma, x):
+def make_DOG(inner_sigma, x):
+    """
+    Creates a difference-of-Gaussians kernel.
+    
+    Arguments: 
+    ---------
+    inner_sigma: width of centre gaussian (surround width is a constant multiple of this)
+    x: domain in one dimension (should have 0 as a centre)  
+    """
     y = x
     outer_sigma = inner_sigma*5
     X, Y = np.meshgrid(x, y)
     inner_gaussian = 1./(2.*np.pi*inner_sigma) * np.exp(-(X**2 + Y**2)/2./inner_sigma**2) 
     outer_gaussian = 1./(2.*np.pi*outer_sigma) * np.exp(-(X**2 + Y**2)/2./outer_sigma**2) 
-#     return inner_gaussian - outer_gaussian
-    return inner_gaussian - outer_gaussian / 2
+    return inner_gaussian - outer_gaussian/2 #weaker surround works better with our weights, which don't account for bursts 
 
 def make_gabor(x, frequency, phase, sigma): 
-    """ Make a Gabor kernel. """
+    """ Makes a 1D Gabor cross-section. """
     return np.cos(frequency*x + phase) * np.exp(-x**2/2./sigma**2)
 
 def make_gabors(x):
     """
-    Creates 1D Gabor cross-sections 
+    Creates 1D Gabor cross-sections. 
     
     Returns:
     -------
@@ -37,10 +44,16 @@ def make_gabors(x):
     return gaborx, gabory
      
 def filter_dots(dots, DOG):
+    """
+    Convolves dot image with kernel. 
+    """
     return nd.filters.convolve(dots, DOG)
 
 
 def shift_kernel(kernel, shape, centre):
+    """
+    Moves kernel to different point in image (this is needed for finding weights). 
+    """
     h, w = kernel.shape
     assert(h % 2 == 1)
     assert(w % 2 == 1)
@@ -52,9 +65,8 @@ def shift_kernel(kernel, shape, centre):
     ind_h = centre[0] + np.arange(0, 2*half_h+1, dtype='int')    
     ind_w = centre[1] + np.arange(0, 2*half_w+1, dtype='int')
     result[ind_h[:,np.newaxis], ind_w] = kernel
-    
-    return result[half_h:-half_h,half_w:-half_w]
-#     return result[np.ix_(np.arange(half_h))half_h:-half_h][half_w:-half_w]
+    result = result[half_h:-half_h,half_w:-half_w]
+    return result 
 
 def mesh(data):
     from mpl_toolkits.mplot3d import Axes3D
@@ -77,7 +89,7 @@ def get_DOGs(inner_sigma, x, shape):
     Returns: 
     Matrix of flattened DOGs. 
     """
-    DOG = make_DOG2(inner_sigma, x)
+    DOG = make_DOG(inner_sigma, x)
     result = np.zeros((shape[0]*shape[1], x.size**2))
     for i in range(shape[0]): 
         for j in range(shape[1]): 
@@ -95,7 +107,7 @@ def get_inputs(w_kernel, filt_stim, centres):
     """
     Arguments: 
     w_kernel: DOG->Gabor weight kernel
-    filt_stim: 
+    filt_stim: DOG-filtered stimulus (height x width x #frames) 
     centres: list of (vertical, horizontal) coords for V1 RF centres
     
     Returns: 
@@ -150,9 +162,14 @@ def get_default_weights():
     return w_kernel
 
 def check_gabor_approx():
-    # plot approximations ... 
+    """
+    Plot approximations of Gabors by wieghted DOGs sums. Columns are difference 
+    Gabors that differ in phase. Top row: ideal Gabors; middle: approximation  
+    calculated by product of flattened DOGs and weights; bottom: approximation by 
+    convolution of DOG and weights.     
+    """    
     x = np.arange(-40, 41, 1)
-    DOG2 = make_DOG2(3, x)
+    DOG2 = make_DOG(3, x)
     DOGs = get_DOGs(3, x, (x.size, x.size))
     gaborx, gabory = make_gabors(x)
     n_gabors = gaborx.shape[1]
@@ -173,9 +190,12 @@ def check_gabor_approx():
 
  
 def filter_default_dots():
-    # filter dot stimulus with DOG filter ...
+    """
+    Filter dot stimulus with DOG filter, where both dot stimulus and DOG params 
+    are default values. 
+    """
     x = np.arange(-40, 41, 1)
-    DOG2 = make_DOG2(3, x)  
+    DOG2 = make_DOG(3, x)  
     dots = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-2000ms-s02.p", "rb" ), encoding='latin1')  
     dots = dots - np.min(dots)
     filtered = np.zeros_like(dots)
@@ -186,6 +206,11 @@ def filter_default_dots():
     pickle.dump(filtered, open("/Users/bptripp/code/nengo-FPGA/v1/dog-filtered-dots-new.p", "wb" ))
     
 def pure_gabor():
+    """
+    Process a default dot stimulus with ideal Gabor filters (i.e. not approximations by sums
+    of bursty DOGs. This is for debugging.   
+    """
+    
     dots = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-2000ms-s02.p", "rb" ), encoding='latin1')  
     x = np.arange(-40, 41, 1)
     gaborx, gabory = make_gabors(x)
@@ -213,6 +238,14 @@ def pure_gabor():
     return result
 
 def get_default_inputs():
+    """
+    Obtain inputs for the neural model using default values for dot stimulus, DOG, 
+    etc. 
+    
+    Returns
+    -------
+    Inputs to V1 receptive fields (# RFs x # Gabors x #time steps)
+    """
 #     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-3.p", "rb" ))
 #     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-2.p", "rb" ))
 #     w_kernel = pickle.load(open("/Users/bptripp/code/nengo-FPGA/v1/dog-gabor-weights-4.p", "rb" ))
@@ -233,13 +266,14 @@ def get_default_inputs():
     return get_inputs(w_kernel, filtered, centres)
 
 
+check_gabor_approx()
 # get_default_weights()
 
-inputs = get_default_inputs()
-pickle.dump(inputs, open("/Users/bptripp/code/nengo-FPGA/v1/inputs.p", "wb" ))
-# inputs = pure_gabor()
-plt.plot(inputs[0,0,:]-10, 'r')
-plt.plot(inputs[0,1,:], 'g')
-plt.plot(inputs[0,2,:]+10, 'b')
-plt.show()
+# inputs = get_default_inputs()
+# pickle.dump(inputs, open("/Users/bptripp/code/nengo-FPGA/v1/inputs.p", "wb" ))
+# # inputs = pure_gabor()
+# plt.plot(inputs[0,0,:]-10, 'r')
+# plt.plot(inputs[0,1,:], 'g')
+# plt.plot(inputs[0,2,:]+10, 'b')
+# plt.show()
 
