@@ -255,18 +255,20 @@ def make_default_inputs(filtered_dot_file):
     n_inputs = 200
     centres = np.random.randn(n_inputs,2)
     mag = np.sum(centres**2, axis=1)**(1/2)
-    centres = 180 * centres.T / mag
+    centres = 155 * centres.T / mag
     centres = centres * np.random.rand(n_inputs)**(1/2)
     centres = np.round(centres).astype('int')
-
+    centres = centres + 199 #put in image centre
+    
     inputs = get_inputs(w_kernel, filtered, centres.T)
+    
     pickle.dump(inputs, open(filtered_dot_file.replace('-filt.p', '-inputs.p'), "wb" ))
 
 
 # dot_file = "/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-s04.p"
 # filter_default_dots(dot_file)
 
-make_default_inputs("/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-s005-filt.p")
+make_default_inputs("/Users/bptripp/code/nengo-FPGA/v1/dot-images-coh1-s04-filt.p")
 
 # check_gabor_approx()
 # get_default_weights()
