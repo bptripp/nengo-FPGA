@@ -955,8 +955,12 @@ encoders and decoded value buffers in order to allow more populations to be
 simulated. % FIXME how could this be done?
 
 \subsection{Conclusion}
-
-- Bryan???
+We have presented a new neuromorphic system based on commodity FPGA hardware. We emphasize that FPGA expertise is not needed to use this system. Models can be developed for the system using the Nengo simulator, and implemented in hardware with a single additional Python command. 
+Compared to existing FPGA approaches to neural simulation, our use of surrogate population models allows a substantial increase in model scale, with associated constraints (e.g. on fan-in, fan-out, and population dimension), and loss of fidelity. 
+However, many existing models are already consistent with these constraints, and further loss of fidelity relative to real neural systems may not be much greater than with point-neuron models, which are already highly simplified. 
+The increase in scale raises the possibility of simulating more extensive neural systems that are capable of richer interactions with the physical world. 
+Because population inputs are transport-agnostic, this system could also potentially be used for very large, power-efficient simulations, by connecting multiple FGPAs through Ethernet or the FPGAs' general-purpose input/output pins. 
+In summary, this work provides a practical and accessible new way to implement neuromorphic systems. 
 
 \bibliographystyle{acm}
 \bibliography{references}
