@@ -428,7 +428,7 @@ begin
 end string_to_std_logic_vector;                                       
                              
 
-file loadfile: TEXT open read_mode is "nengo_rt_tb.nengo-rt";
+file loadfile: TEXT open read_mode is "v1.nengo-rt";
 
 begin
 
