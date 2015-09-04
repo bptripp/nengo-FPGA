@@ -18,18 +18,14 @@ entity decoder_unit_top_half_1d is port (
     pc4: out std_logic_vector(11 downto 0);
     pc5: out std_logic_vector(11 downto 0);
     pc6: out std_logic_vector(11 downto 0);
-    pc7: out std_logic_vector(11 downto 0);
+    --pc7: out std_logic_vector(11 downto 0); -- moved to bottom half
     pc_valid: out std_logic;
     pc_ack: in std_logic;
     
     -- programming interface
     pc_prog_addr: in std_logic_vector(13 downto 0); -- top bit unused (due to only 7 PCs); 12 downto 10 chooses a PC; 9 downto 0 addresses in PC
     pc_prog_we: in std_logic;
-    pc_prog_data: in std_logic_vector(11 downto 0);
-    
-    normal_prog_addr: in std_logic_vector(1 downto 0);
-    normal_prog_we: in std_logic;
-    normal_prog_data: in std_logic_vector(31 downto 0)
+    pc_prog_data: in std_logic_vector(11 downto 0)
 ); end entity decoder_unit_top_half_1d;
 
 architecture rtl of decoder_unit_top_half_1d is
@@ -46,7 +42,6 @@ architecture rtl of decoder_unit_top_half_1d is
         pc4: std_logic_vector(11 downto 0);
         pc5: std_logic_vector(11 downto 0);
         pc6: std_logic_vector(11 downto 0);
-        pc7: std_logic_vector(11 downto 0);
         pc_valid: std_logic;
     end record;
     constant reg_reset: ci_type := (
@@ -60,7 +55,6 @@ architecture rtl of decoder_unit_top_half_1d is
         pc4 => X"000",
         pc5 => X"000",
         pc6 => X"000",
-        pc7 => X"000",
         pc_valid => '0'
     );
     signal reg: ci_type := reg_reset;
@@ -88,25 +82,6 @@ architecture rtl of decoder_unit_top_half_1d is
     signal pc_outputs_ready: std_logic;
     
     signal pc_prog_cs: std_logic_vector(6 downto 0);
-    
-    component normal Port ( 
-           clk : in STD_LOGIC;
-           rst : in STD_LOGIC;
-           q : out signed (15 downto 0);
-           prog_addr: in std_logic_vector(1 downto 0);
-           prog_we: in std_logic;
-           prog_data: in std_logic_vector(31 downto 0)
-           ); end component;
-    signal normal_out: signed(15 downto 0);
-    signal normal_out_sfixed : sfixed(1 downto -14);
-    
-    component bandpass Port ( 
-           clk : in  STD_LOGIC;
-           valid : in  STD_LOGIC;
-           u : in  SFIXED (1 downto -14);
-           y : out  SFIXED (1 downto -14)); end component;    
-    signal h3_output: sfixed(1 downto -14);
-    
 begin
 
     encoder_fifo_rd_en <= reg.fifo_rd;
@@ -117,7 +92,6 @@ begin
     pc4 <= reg.pc4;
     pc5 <= reg.pc5;
     pc6 <= reg.pc6;
-    pc7 <= reg.pc7;
     pc_valid <= reg.pc_valid;
 
     COMB: process(reg, rst, encoder_fifo_u, encoder_fifo_empty, 
@@ -147,7 +121,6 @@ begin
                         ci.pc4 := pc_data(4);
                         ci.pc5 := pc_data(5);
                         ci.pc6 := pc_data(6);
-                        ci.pc7 := pc_data(7);
                         ci.pc_valid := '1';
                         ci.state := state_wait_for_next_stage_ack;
                     end if;
@@ -207,23 +180,5 @@ begin
             prog_data => pc_prog_data
         );
     end generate;
-    
-    NORMAL_GEN: normal port map (
-        clk => clk,
-        rst => rst,
-        q => normal_out,
-        prog_addr => normal_prog_addr,
-        prog_we => normal_prog_we,
-        prog_data => normal_prog_data
-    );
-    
-    normal_out_sfixed <= to_sfixed(std_logic_vector(normal_out), 1,-14);
-    H3: bandpass port map (
-        clk => clk,
-        valid => '1', -- CHEATING: sample 100% of the time
-        u => normal_out_sfixed,
-        y => h3_output
-    );
-    pc_data(7) <= to_slv(normal_out_sfixed)(15 downto 4);
 
 end architecture rtl;

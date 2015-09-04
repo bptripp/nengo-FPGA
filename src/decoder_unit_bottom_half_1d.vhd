@@ -20,7 +20,7 @@ entity decoder_unit_bottom_half_1d is generic (
     pc4: in std_logic_vector(11 downto 0);
     pc5: in std_logic_vector(11 downto 0);
     pc6: in std_logic_vector(11 downto 0);
-    pc7: in std_logic_vector(11 downto 0);
+    --pc7: in std_logic_vector(11 downto 0); -- normal gen now integrated here
     pc_ready: in std_logic;
     pc_ack: out std_logic;
     
@@ -28,6 +28,10 @@ entity decoder_unit_bottom_half_1d is generic (
     prog_addr: in std_logic_vector(5 downto 0); -- top 2 bits select which of the 4 DVs are being decoded; bottom 4 choose a decoder buffer for that DV
     prog_we: in std_logic;
     prog_data: in std_logic_vector(11 downto 0);
+	 
+    normal_prog_addr: in std_logic_vector(3 downto 0); -- top 2 bits select a DV; bottom 2 bits select an LFSR
+    normal_prog_we: in std_logic;
+    normal_prog_data: in std_logic_vector(31 downto 0);
     
     -- DV write ports
     dv0_addr: out std_logic_vector(10 downto 0);
@@ -87,6 +91,33 @@ architecture rtl of decoder_unit_bottom_half_1d is
     all_done: out std_logic        
     ); end component;
     
+    component normal Port ( 
+           clk : in STD_LOGIC;
+           rst : in STD_LOGIC;
+           q : out signed (15 downto 0);
+           prog_addr: in std_logic_vector(1 downto 0);
+           prog_we: in std_logic;
+           prog_data: in std_logic_vector(31 downto 0)
+           ); end component;
+    type normal_out_type is array(0 to 3) of signed(15 downto 0);
+    type normal_out_sfixed_type is array(0 to 3) of sfixed(1 downto -14);
+    signal normal_out: normal_out_type;
+    signal normal_out_sfixed: normal_out_sfixed_type;
+
+    signal normal_prog_cs: std_logic_vector(3 downto 0);
+    signal normal_prog_cs_we: std_logic_vector(3 downto 0);
+        
+    component bandpass Port ( 
+           clk : in  STD_LOGIC;
+           valid : in  STD_LOGIC;
+           u : in  SFIXED (1 downto -14);
+           y : out  SFIXED (1 downto -14)); end component;
+    type h3_output_type is array(0 to 3) of sfixed(1 downto -14);
+    signal h3_output: h3_output_type;
+
+    type pc7_data_type is array(0 to 3) of std_logic_vector(11 downto 0);
+    signal pc7_data: pc7_data_type;
+	 
    component decoder_coefficient_fifo   PORT (
       clk : IN STD_LOGIC;
       rst : IN STD_LOGIC;
@@ -97,7 +128,7 @@ architecture rtl of decoder_unit_bottom_half_1d is
       full : OUT STD_LOGIC;
       empty : OUT STD_LOGIC
     ); end component;
-           
+    
    type decoder_coefficient_bank is array(0 to 7) of std_logic_vector(11 downto 0);
    type decoder_bank_type is array(0 to 3) of decoder_coefficient_bank;
    signal decoder_bank: decoder_bank_type;
@@ -115,7 +146,47 @@ architecture rtl of decoder_unit_bottom_half_1d is
    signal shreg_ready: std_logic_vector(31 downto 0); -- convenience. all shregs will finish simultaneously
 begin
 
-    DECODERS: for I in 0 to 3 generate
+  DECODE_NORMAL_PROG: process(normal_prog_addr)
+  begin
+    case normal_prog_addr(3 downto 2) is
+      when "00" =>
+        normal_prog_cs <= "0001";
+      when "01" =>
+        normal_prog_cs <= "0010";
+      when "10" =>
+        normal_prog_cs <= "0100";
+      when "11" =>
+        normal_prog_cs <= "1000";
+      when others =>
+        normal_prog_cs <= "0000";
+    end case;
+  end process;
+  normal_prog_cs_we(3) <= normal_prog_cs(3) and normal_prog_we;
+  normal_prog_cs_we(2) <= normal_prog_cs(2) and normal_prog_we;
+  normal_prog_cs_we(1) <= normal_prog_cs(1) and normal_prog_we;
+  normal_prog_cs_we(0) <= normal_prog_cs(0) and normal_prog_we;
+
+
+  DECODERS: for I in 0 to 3 generate
+    NORMAL_GEN: normal port map (
+        clk => clk,
+        rst => rst,
+        q => normal_out(I),
+        prog_addr => normal_prog_addr(1 downto 0),
+        prog_we => normal_prog_cs_we(I),
+        prog_data => normal_prog_data
+    );
+    
+    normal_out_sfixed(I) <= to_sfixed(std_logic_vector(normal_out(I)), 1,-14);
+    H3: bandpass port map (
+        clk => clk,
+        valid => '1', -- CHEATING: sample 100% of the time
+        u => normal_out_sfixed(I),
+        y => h3_output(I)
+    );
+    --pc7_data(I) <= to_slv(normal_out_sfixed(I))(15 downto 4);
+    pc7_data(I) <= to_slv(h3_output(I))(15 downto 4);
+    
         FIFOS: for J in 0 to 7 generate
             FIFO: decoder_coefficient_fifo port map (
                 clk => clk,
@@ -150,7 +221,7 @@ begin
             pc4_data => pc4,
             pc5_data => pc5,
             pc6_data => pc6,
-            pc7_data => pc7,
+            pc7_data => pc7_data(I),
             pc_ready => pc_ready,
             v0 => decoder_bank(I)(0),
             v1 => decoder_bank(I)(1),
