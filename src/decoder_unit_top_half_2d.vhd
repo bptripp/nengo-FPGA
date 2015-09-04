@@ -32,18 +32,14 @@ entity decoder_unit_top_half_2d is port (
     pc12: out std_logic_vector(11 downto 0);
     pc13: out std_logic_vector(11 downto 0);
     pc14: out std_logic_vector(11 downto 0);
-    pc15: out std_logic_vector(11 downto 0);
+    --pc15: out std_logic_vector(11 downto 0); -- moved to bottom half
     pc_valid: out std_logic;
     pc_ack: in std_logic;
     
     -- programming interface
     pc_prog_addr: in std_logic_vector(13 downto 0); -- 13 downto 10 chooses a PC; 9 downto 0 addresses in PC
     pc_prog_we: in std_logic;
-    pc_prog_data: in std_logic_vector(11 downto 0);
-    
-    normal_prog_addr: in std_logic_vector(1 downto 0);
-    normal_prog_we: in std_logic;
-    normal_prog_data: in std_logic_vector(31 downto 0)
+    pc_prog_data: in std_logic_vector(11 downto 0)
 ); end entity decoder_unit_top_half_2d;
 
 architecture rtl of decoder_unit_top_half_2d is
@@ -62,21 +58,20 @@ architecture rtl of decoder_unit_top_half_2d is
         pc5: std_logic_vector(11 downto 0);
         pc6: std_logic_vector(11 downto 0);
         pc7: std_logic_vector(11 downto 0);
-		  pc8: std_logic_vector(11 downto 0);
+        pc8: std_logic_vector(11 downto 0);
         pc9: std_logic_vector(11 downto 0);
         pc10: std_logic_vector(11 downto 0);
         pc11: std_logic_vector(11 downto 0);
         pc12: std_logic_vector(11 downto 0);
         pc13: std_logic_vector(11 downto 0);
         pc14: std_logic_vector(11 downto 0);
-        pc15: std_logic_vector(11 downto 0);
         pc_valid: std_logic;
     end record;
     constant reg_reset: ci_type := (
         state => state_wait_for_fifo,
         fifo_rd => '0',
         pc_input_x => X"000",
-		  pc_input_y => X"000",
+        pc_input_y => X"000",
         pc0 => X"000",
         pc1 => X"000",
         pc2 => X"000",
@@ -85,14 +80,13 @@ architecture rtl of decoder_unit_top_half_2d is
         pc5 => X"000",
         pc6 => X"000",
         pc7 => X"000",
-		  pc8 => X"000",
+        pc8 => X"000",
         pc9 => X"000",
         pc10 => X"000",
         pc11 => X"000",
         pc12 => X"000",
         pc13 => X"000",
         pc14 => X"000",
-        pc15 => X"000",
         pc_valid => '0'
     );
     signal reg: ci_type := reg_reset;
@@ -121,24 +115,6 @@ architecture rtl of decoder_unit_top_half_2d is
     
     signal pc_prog_cs: std_logic_vector(14 downto 0);
     
-    component normal Port ( 
-           clk : in STD_LOGIC;
-           rst : in STD_LOGIC;
-           q : out signed (15 downto 0);
-           prog_addr: in std_logic_vector(1 downto 0);
-           prog_we: in std_logic;
-           prog_data: in std_logic_vector(31 downto 0)
-           ); end component;
-    signal normal_out: signed(15 downto 0);
-    signal normal_out_sfixed : sfixed(1 downto -14);
-    
-    component bandpass Port ( 
-           clk : in  STD_LOGIC;
-           valid : in  STD_LOGIC;
-           u : in  SFIXED (1 downto -14);
-           y : out  SFIXED (1 downto -14)); end component;    
-    signal h3_output: sfixed(1 downto -14);
-    
 begin
 
     x_encoder_fifo_rd_en <= reg.fifo_rd;
@@ -158,7 +134,6 @@ begin
     pc12 <= reg.pc12;
     pc13 <= reg.pc13;
     pc14 <= reg.pc14;
-    pc15 <= reg.pc15;
     pc_valid <= reg.pc_valid;
 
     COMB: process(reg, rst, x_encoder_fifo, x_encoder_fifo_empty, y_encoder_fifo, y_encoder_fifo_empty,
@@ -190,14 +165,13 @@ begin
                         ci.pc5 := pc_data(5);
                         ci.pc6 := pc_data(6);
                         ci.pc7 := pc_data(7);
-								ci.pc8 := pc_data(8);
+                        ci.pc8 := pc_data(8);
                         ci.pc9 := pc_data(9);
                         ci.pc10 := pc_data(10);
                         ci.pc11 := pc_data(11);
                         ci.pc12 := pc_data(12);
                         ci.pc13 := pc_data(13);
                         ci.pc14 := pc_data(14);
-                        ci.pc15 := pc_data(15);
                         ci.pc_valid := '1';
                         ci.state := state_wait_for_next_stage_ack;
                     end if;
@@ -275,23 +249,5 @@ begin
             prog_data => pc_prog_data
         );
     end generate;
-    
-    NORMAL_GEN: normal port map (
-        clk => clk,
-        rst => rst,
-        q => normal_out,
-        prog_addr => normal_prog_addr,
-        prog_we => normal_prog_we,
-        prog_data => normal_prog_data
-    );
-    
-    normal_out_sfixed <= to_sfixed(std_logic_vector(normal_out), 1,-14);
-    H3: bandpass port map (
-        clk => clk,
-        valid => '1', -- CHEATING: sample 100% of the time
-        u => normal_out_sfixed,
-        y => h3_output
-    );
-    pc_data(15) <= to_slv(normal_out_sfixed)(15 downto 4);
 
 end architecture rtl;

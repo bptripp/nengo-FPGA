@@ -146,25 +146,21 @@ component decoder_unit_top_half_2d port (
     pc5: out std_logic_vector(11 downto 0);
     pc6: out std_logic_vector(11 downto 0);
     pc7: out std_logic_vector(11 downto 0);
-	 pc8: out std_logic_vector(11 downto 0);
+    pc8: out std_logic_vector(11 downto 0);
     pc9: out std_logic_vector(11 downto 0);
     pc10: out std_logic_vector(11 downto 0);
     pc11: out std_logic_vector(11 downto 0);
     pc12: out std_logic_vector(11 downto 0);
     pc13: out std_logic_vector(11 downto 0);
     pc14: out std_logic_vector(11 downto 0);
-    pc15: out std_logic_vector(11 downto 0);
+    --pc15: out std_logic_vector(11 downto 0);
     pc_valid: out std_logic;
     pc_ack: in std_logic;
     
     -- programming interface
     pc_prog_addr: in std_logic_vector(13 downto 0); -- 13 downto 10 chooses a PC; 9 downto 0 addresses in PC
     pc_prog_we: in std_logic;
-    pc_prog_data: in std_logic_vector(11 downto 0);
-    
-    normal_prog_addr: in std_logic_vector(1 downto 0);
-    normal_prog_we: in std_logic;
-    normal_prog_data: in std_logic_vector(31 downto 0)
+    pc_prog_data: in std_logic_vector(11 downto 0)
 ); end component;
 signal decoder_empty: std_logic;
 signal decoder_pc0: std_logic_vector(11 downto 0);
@@ -182,7 +178,6 @@ signal decoder_pc11: std_logic_vector(11 downto 0);
 signal decoder_pc12: std_logic_vector(11 downto 0);
 signal decoder_pc13: std_logic_vector(11 downto 0);
 signal decoder_pc14: std_logic_vector(11 downto 0);
-signal decoder_pc15: std_logic_vector(11 downto 0);
 signal decoder_valid: std_logic;
 signal decoder_ack: std_logic;      
                                    
@@ -209,7 +204,6 @@ component decoder_unit_bottom_half_2d generic (
     pc12: in std_logic_vector(11 downto 0);
     pc13: in std_logic_vector(11 downto 0);
     pc14: in std_logic_vector(11 downto 0);
-    pc15: in std_logic_vector(11 downto 0);
     pc_ready: in std_logic;
     pc_ack: out std_logic;
     
@@ -217,6 +211,10 @@ component decoder_unit_bottom_half_2d generic (
     prog_addr: in std_logic_vector(5 downto 0); -- top 2 bits select which of the 4 DVs are being decoded; bottom 4 choose a decoder buffer for that DV
     prog_we: in std_logic;
     prog_data: in std_logic_vector(11 downto 0);
+
+    normal_prog_addr: in std_logic_vector(3 downto 0);
+    normal_prog_we: in std_logic;
+    normal_prog_data: in std_logic_vector(31 downto 0);
     
     -- DV write ports
     dv0_addr: out std_logic_vector(10 downto 0);
@@ -322,17 +320,12 @@ DECODER_TOP_HALF: decoder_unit_top_half_2d port map (
 	pc12 => decoder_pc12,
 	pc13 => decoder_pc13,
 	pc14 => decoder_pc14,
-	pc15 => decoder_pc15,
 	pc_valid => decoder_valid,
 	pc_ack => decoder_ack,
 	
 	pc_prog_addr => prog_addr(13 downto 0),
 	pc_prog_we => prog_pc_we,
-	pc_prog_data => prog_data(11 downto 0),
-	
-	normal_prog_addr => prog_addr(1 downto 0),
-	normal_prog_we => prog_pc_lfsr_we,
-	normal_prog_data => prog_data(31 downto 0)
+	pc_prog_data => prog_data(11 downto 0)
 );
 --decoder_empty <= '1' when encoded_value_ready = '0' else '0'; -- FIXME what is this signal used for?
 
@@ -359,7 +352,6 @@ DECODER_BOTTOM_HALF: decoder_unit_bottom_half_2d generic map (
 	pc12 => decoder_pc12,
 	pc13 => decoder_pc13,
 	pc14 => decoder_pc14,
-	pc15 => decoder_pc15,
 	pc_ready => decoder_valid,
 	pc_ack => decoder_ack,
 	
@@ -367,7 +359,11 @@ DECODER_BOTTOM_HALF: decoder_unit_bottom_half_2d generic map (
 	prog_addr => prog_addr(5 downto 0),
 	prog_we => prog_decoder_memory_we,
 	prog_data => prog_data(11 downto 0),
-	
+
+	normal_prog_addr => prog_addr(3 downto 0),
+	normal_prog_we => prog_pc_lfsr_we,
+	normal_prog_data => prog_data(31 downto 0),
+        
 	dv0_addr => decoder0_dv_addr,
 	dv0_we => decoder0_dv_we,
 	dv0_data => decoder0_dv_data,

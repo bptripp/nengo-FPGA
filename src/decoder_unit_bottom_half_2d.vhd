@@ -28,7 +28,7 @@ entity decoder_unit_bottom_half_2d is generic (
     pc12: in std_logic_vector(11 downto 0);
     pc13: in std_logic_vector(11 downto 0);
     pc14: in std_logic_vector(11 downto 0);
-    pc15: in std_logic_vector(11 downto 0);
+--    pc15: in std_logic_vector(11 downto 0);
     pc_ready: in std_logic;
     pc_ack: out std_logic;
     
@@ -36,6 +36,10 @@ entity decoder_unit_bottom_half_2d is generic (
     prog_addr: in std_logic_vector(5 downto 0); -- top 2 bits select which of the 4 DVs are being decoded; bottom 4 choose a decoder buffer for that DV
     prog_we: in std_logic;
     prog_data: in std_logic_vector(11 downto 0);
+
+    normal_prog_addr: in std_logic_vector(3 downto 0);
+    normal_prog_we: in std_logic;
+    normal_prog_data: in std_logic_vector(31 downto 0);
     
     -- DV write ports
     dv0_addr: out std_logic_vector(10 downto 0);
@@ -57,6 +61,33 @@ entity decoder_unit_bottom_half_2d is generic (
 ); end entity decoder_unit_bottom_half_2d;
 
 architecture rtl of decoder_unit_bottom_half_2d is
+    component normal Port ( 
+           clk : in STD_LOGIC;
+           rst : in STD_LOGIC;
+           q : out signed (15 downto 0);
+           prog_addr: in std_logic_vector(1 downto 0);
+           prog_we: in std_logic;
+           prog_data: in std_logic_vector(31 downto 0)
+           ); end component;
+    type normal_out_type is array(0 to 3) of signed(15 downto 0);
+    type normal_out_sfixed_type is array(0 to 3) of sfixed(1 downto -14);
+    signal normal_out: normal_out_type;
+    signal normal_out_sfixed: normal_out_sfixed_type;
+
+    signal normal_prog_cs: std_logic_vector(3 downto 0);
+    signal normal_prog_cs_we: std_logic_vector(3 downto 0);
+    
+    component bandpass Port ( 
+           clk : in  STD_LOGIC;
+           valid : in  STD_LOGIC;
+           u : in  SFIXED (1 downto -14);
+           y : out  SFIXED (1 downto -14)); end component;    
+    type h3_output_type is array(0 to 3) of sfixed(1 downto -14);
+    signal h3_output: h3_output_type;
+
+    type pc15_data_type is array(0 to 3) of std_logic_vector(11 downto 0);
+    signal pc15_data: pc15_data_type;
+  
     component programmable_decoder_1d generic (
         shift: integer := 0 -- for the actual decoder. FIXME can this really be a compile-time constant?
     ); 
@@ -150,8 +181,49 @@ architecture rtl of decoder_unit_bottom_half_2d is
    signal shreg_ready: std_logic_vector(31 downto 0); -- convenience. all shregs will finish simultaneously
 	
 begin
+  
+  DECODE_NORMAL_PROG: process(normal_prog_addr)
+  begin
+    case normal_prog_addr(3 downto 2) is
+      when "00" =>
+        normal_prog_cs <= "0001";
+      when "01" =>
+        normal_prog_cs <= "0010";
+      when "10" =>
+        normal_prog_cs <= "0100";
+      when "11" =>
+        normal_prog_cs <= "1000";
+      when others =>
+        normal_prog_cs <= "0000";
+    end case;
+  end process;
+  normal_prog_cs_we(3) <= normal_prog_cs(3) and normal_prog_we;
+  normal_prog_cs_we(2) <= normal_prog_cs(2) and normal_prog_we;
+  normal_prog_cs_we(1) <= normal_prog_cs(1) and normal_prog_we;
+  normal_prog_cs_we(0) <= normal_prog_cs(0) and normal_prog_we;
 
+  
     DECODERS: for I in 0 to 3 generate
+      NORMAL_GEN: normal port map (
+        clk => clk,
+        rst => rst,
+        q => normal_out(I),
+        prog_addr => normal_prog_addr(1 downto 0),
+        prog_we => normal_prog_cs_we(I),
+        prog_data => normal_prog_data
+        );
+    
+      normal_out_sfixed(I) <= to_sfixed(std_logic_vector(normal_out(I)), 1,-14);
+      H3: bandpass port map (
+        clk => clk,
+        valid => '1', -- CHEATING: sample 100% of the time
+        u => normal_out_sfixed(I),
+        y => h3_output(I)
+        );
+      --pc15_data(I) <= to_slv(normal_out_sfixed(I))(15 downto 4);
+      pc15_data(I) <= to_slv(h3_output(I))(15 downto 4);
+      
+      
         FIFOS: for J in 0 to 15 generate
             FIFO: decoder_coefficient_fifo port map (
                 clk => clk,
@@ -201,7 +273,7 @@ begin
             timestep => timestep,
             all_done => decoder_done(I)
         );
-		  DECODER1: programmable_decoder_1d generic map (
+      DECODER1: programmable_decoder_1d generic map (
             shift => shift
         ) port map (
             clk => clk,
@@ -213,7 +285,7 @@ begin
             pc4_data => pc12,
             pc5_data => pc13,
             pc6_data => pc14,
-            pc7_data => pc15,
+            pc7_data => pc15_data(I),
             pc_ready => pc_ready,
             v0 => decoder_bank(I)(8),
             v1 => decoder_bank(I)(9),
